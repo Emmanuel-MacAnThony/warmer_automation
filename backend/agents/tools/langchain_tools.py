@@ -7,8 +7,8 @@ import logging
 from typing import Dict, Any, Optional
 from langchain_core.tools import tool
 
-from backend.clients.linkedin_scraper import scrape_linkedin_profile
-from backend.clients.airtable_client import AirtableClient
+from backend.intelligence.linkedin.scraper import scrape_linkedin_profile
+from backend.crm.airtable import AirtableClient
 from backend.config import Config, AIRTABLE_FIELDS
 from backend.agents.subagents.linkedin_agent import LinkedInAnalyzerAgent
 from backend.agents.guardrails.output_validator import OutputValidator

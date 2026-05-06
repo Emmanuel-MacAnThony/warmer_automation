@@ -323,7 +323,7 @@ class AirtableClient:
             try:
                 base = self.api.base(Config.AIRTABLE_BASE_ID)
                 tables_info = base.schema()
-                print(f"✓ Successfully connected to base!")
+                print(f"Successfully connected to base!")
                 print(f"\nAvailable tables in this base:")
                 for i, table in enumerate(tables_info.tables, 1):
                     print(f"  {i}. {table.name} (ID: {table.id})")
@@ -331,14 +331,14 @@ class AirtableClient:
                 # Check if our table name exists
                 table_names = [t.name for t in tables_info.tables]
                 if Config.AIRTABLE_TABLE_NAME not in table_names:
-                    print(f"\n⚠️  WARNING: '{Config.AIRTABLE_TABLE_NAME}' not found in available tables!")
+                    print(f"\nWARNING: '{Config.AIRTABLE_TABLE_NAME}' not found in available tables!")
                     print(f"Available table names: {table_names}")
                     return False
                 else:
-                    print(f"\n✓ Table '{Config.AIRTABLE_TABLE_NAME}' exists")
+                    print(f"\nTable '{Config.AIRTABLE_TABLE_NAME}' exists")
 
             except Exception as e:
-                print(f"✗ Could not list tables: {e}")
+                print(f"Could not list tables: {e}")
                 print("This might be a permissions issue with your token.")
                 return False
 
@@ -411,7 +411,7 @@ class AirtableClient:
 
         except Exception as e:
             print("\n" + "="*60)
-            print("❌ Connection Failed")
+            print("Connection Failed")
             print("="*60)
             print(f"\nError: {e}")
             print("\nCheck:")
@@ -445,14 +445,14 @@ if __name__ == "__main__":
         exit(0 if success else 1)
 
     except ValueError as e:
-        print(f"\n❌ Configuration Error: {e}")
+        print(f"\nConfiguration Error: {e}")
         print("\nMake sure you have a .env file with:")
         print("  AIRTABLE_API_KEY=your_key")
         print("  AIRTABLE_BASE_ID=your_base_id")
         print("  AIRTABLE_TABLE_NAME=your_table_name")
         exit(1)
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\nError: {e}")
         import traceback
         traceback.print_exc()
         exit(1)

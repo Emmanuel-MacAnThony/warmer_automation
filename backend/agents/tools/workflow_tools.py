@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, validator
 from langchain.tools import tool
 
 from backend.agents.workflows.enrichment import get_enrichment_workflow
-from backend.clients.airtable_client import AirtableClient
+from backend.crm.airtable import AirtableClient
 from backend.agents.tools.langchain_tools import get_airtable_schema
 
 logger = logging.getLogger(__name__)

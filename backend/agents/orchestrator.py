@@ -157,7 +157,7 @@ class CRMOrchestrator:
             linkedin_url = airtable_context.get('linkedin_url')
             if not linkedin_url and airtable_context.get('record_id'):
                 logger.info("Fetching LinkedIn URL from Airtable record")
-                from backend.clients.airtable_client import AirtableClient
+                from backend.crm.airtable import AirtableClient
                 airtable_client = AirtableClient()
                 record = airtable_client.fetch_record_by_id(airtable_context.get('record_id'))
 

@@ -23,20 +23,21 @@ from apify_client import ApifyClient
 from tenacity import retry, stop_after_attempt, wait_exponential, wait_random
 
 from backend.config import Config
-from backend.clients.airtable_client import AirtableClient
-from backend.clients.linkedin_scraper import preserve_apify_data
-from backend.clients.serp_client import SerpClient
+from backend.crm.airtable import AirtableClient
+from backend.intelligence.linkedin.scraper import preserve_apify_data
+from backend.pipeline.linkedin_finder import LinkedInFinder
+from backend.intelligence.news.client import NewsClient
 from backend.agents.subagents.matching_agent import LLMMatcher
 from backend.db import client as db
-from backend.enrichment.apify_pool import get_pool
-from backend.enrichment.batch_analyzer import (
+from backend.pipeline.apify_pool import get_pool
+from backend.pipeline.analyzer import (
     BatchAnalyzer, BatchOutputValidator,
     PROFILE_SIGNAL_FIELDS, extract_career_progression,
 )
-from backend.enrichment.posts_analyzer import extract_post_signals, POST_SIGNAL_FIELDS
-from backend.enrichment.news_analyzer import parse_news_results, NEWS_SIGNAL_FIELDS
-from backend.enrichment.twitter_analyzer import extract_tweet_signals, TWEET_SIGNAL_FIELDS
-# from backend.clients.crunchbase_scraper import scrape_crunchbase_profile  # Week 2
+from backend.intelligence.linkedin.analyzer import extract_post_signals, POST_SIGNAL_FIELDS
+from backend.intelligence.news.analyzer import parse_news_results, NEWS_SIGNAL_FIELDS
+from backend.intelligence.twitter.analyzer import extract_tweet_signals, TWEET_SIGNAL_FIELDS
+# from backend.intelligence.crunchbase.scraper import scrape_crunchbase_profile  # Week 2
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,8 @@ _serp_semaphore = asyncio.Semaphore(5)
 # ---------------------------------------------------------------------------
 
 _airtable: Optional[AirtableClient] = None
-_serp: Optional[SerpClient] = None
+_finder: Optional[LinkedInFinder] = None
+_news_client: Optional[NewsClient] = None
 _matcher: Optional[LLMMatcher] = None
 _analyzer: Optional[BatchAnalyzer] = None
 _validator: Optional[BatchOutputValidator] = None
@@ -61,11 +63,18 @@ def _get_airtable() -> AirtableClient:
     return _airtable
 
 
-def _get_serp() -> SerpClient:
-    global _serp
-    if _serp is None:
-        _serp = SerpClient()
-    return _serp
+def _get_finder() -> LinkedInFinder:
+    global _finder
+    if _finder is None:
+        _finder = LinkedInFinder()
+    return _finder
+
+
+def _get_news_client() -> NewsClient:
+    global _news_client
+    if _news_client is None:
+        _news_client = NewsClient()
+    return _news_client
 
 
 def _get_matcher() -> LLMMatcher:
@@ -134,7 +143,7 @@ def _scrape_posts_sync(profile_url: str, token: str) -> List[Dict]:
 )
 def _scrape_tweets_sync(handle: str) -> List[Dict]:
     """Scrape recent tweets for a Twitter handle. Returns raw tweet list."""
-    from backend.clients.twitter_scraper import scrape_user_tweets
+    from backend.intelligence.twitter.scraper import scrape_user_tweets
     return scrape_user_tweets(handle, max_tweets=30)
 
 
@@ -178,7 +187,7 @@ async def _news_search_async(name: str, company: str, loop) -> Dict:
     if not name:
         return {"press_count": 0}
     async with _serp_semaphore:
-        results = await loop.run_in_executor(None, _get_serp().search_news, name, company)
+        results = await loop.run_in_executor(None, _get_news_client().search_news, name, company)
     return parse_news_results(results, name)
 
 
@@ -188,7 +197,7 @@ async def _news_search_async(name: str, company: str, loop) -> Dict:
     reraise=True,
 )
 def _search_sync(contact: Dict) -> List[Dict]:
-    return _get_serp().search_linkedin_profiles(contact, num_results=10)
+    return _get_finder().search_linkedin_profiles(contact, num_results=10)
 
 
 def _rank_sync(contact: Dict, candidates: List[Dict]):

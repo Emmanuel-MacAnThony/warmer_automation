@@ -177,7 +177,7 @@ if __name__ == "__main__":
     print("This may take 30-60 seconds...\n")
 
     async def run():
-        from backend.enrichment.twitter_analyzer import extract_tweet_signals
+        from backend.intelligence.twitter.analyzer import extract_tweet_signals
 
         # Step 1 — scrape
         tweets = scrape_user_tweets(test_handle, max_tweets=50)

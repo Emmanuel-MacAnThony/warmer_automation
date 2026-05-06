@@ -15,7 +15,7 @@ import logging
 from typing import Dict
 
 from backend.db import client as db
-from backend.enrichment.batch_executor import BatchExecutor
+from backend.pipeline.executor import BatchExecutor
 
 logger = logging.getLogger(__name__)
 

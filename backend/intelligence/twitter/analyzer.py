@@ -2,7 +2,7 @@
 Twitter/X Posts Intelligence Analyzer
 
 Takes raw Apify tweet output and extracts structured fundraising signals
-via a single LLM call — same pattern as posts_analyzer.py for LinkedIn.
+via a single LLM call — same pattern as analyzer.py for LinkedIn.
 
 Pipeline:
   1. pre_filter_tweets()  — score + rank tweets, keep highest-signal subset (no LLM)
@@ -27,6 +27,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from backend.config import Config
+from backend.intelligence.shared.keywords import (
+    WEALTH_SIGNAL_TERMS,
+    GIVING_SIGNAL_TERMS,
+    PERSONALITY_TYPES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,43 +43,6 @@ TWEET_SIGNAL_FIELDS: Dict[str, str] = {
     "tweet_personality_type": "singleSelect",
     "tweet_last_active":      "singleLineText",
     "tweet_analyzed_links":   "multilineText",
-}
-
-# ---------------------------------------------------------------------------
-# Signal keyword dictionaries — same logic as posts_analyzer.py
-# ---------------------------------------------------------------------------
-
-WEALTH_SIGNAL_TERMS = {
-    "acquisition":   ["acquired", "acquisition", "acqui-hire", "bought by", "sold to", "merger"],
-    "ipo":           ["IPO", "went public", "listed on", "NYSE", "NASDAQ", "stock market"],
-    "fundraise":     ["raised", "Series A", "Series B", "Series C", "seed round", "funding round",
-                      "closed our round", "we raised", "announced funding"],
-    "exit":          ["exit", "exited", "sold the company", "liquidity event"],
-    "investment":    ["invested in", "led the round", "participated in", "portfolio company",
-                      "angel investment", "we invested"],
-    "fund_close":    ["closed our fund", "fund close", "first close", "final close", "new fund"],
-}
-
-GIVING_SIGNAL_TERMS = {
-    "donation":      ["donated", "donation", "gave", "gift", "contributed", "contributing"],
-    "cause_mention": ["nonprofit", "non-profit", "foundation", "charity", "charitable",
-                      "501(c)", "social impact", "mission-driven"],
-    "pledge":        ["pledged", "pledge", "matching", "match my donation", "giving pledge",
-                      "committed to", "committing"],
-    "volunteering":  ["volunteered", "volunteering", "pro bono", "board member", "advisory board"],
-    "impact_invest": ["impact investing", "ESG", "sustainable", "double bottom line",
-                      "social enterprise", "B Corp"],
-}
-
-PERSONALITY_TYPES = {
-    "thought_leader": "Writes original opinions, arguments, or industry takes. "
-                      "High replies relative to likes. Debates ideas.",
-    "curator":        "Primarily retweets or quotes others' content with brief commentary. "
-                      "Retweets outnumber original posts.",
-    "self_promoter":  "Posts focus on personal wins, company news, awards, press coverage. "
-                      "Content is mostly about themselves or their company.",
-    "passive":        "Tweets infrequently or has very low engagement. "
-                      "Not an active Twitter voice.",
 }
 
 # Calibrated for Twitter — views make engagement thresholds much higher than LinkedIn

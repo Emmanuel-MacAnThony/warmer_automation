@@ -52,7 +52,7 @@ async def lifespan(_app: FastAPI):
         logger.warning(f"Startup recovery failed (non-fatal): {e}")
 
     try:
-        from backend.enrichment.executor_manager import get_manager
+        from backend.pipeline.manager import get_manager
 
         resumed = await get_manager().auto_resume()
         if resumed:
@@ -64,7 +64,7 @@ async def lifespan(_app: FastAPI):
 
     # --- shutdown ---
     try:
-        from backend.enrichment.executor_manager import get_manager
+        from backend.pipeline.manager import get_manager
 
         await get_manager().shutdown()
     except Exception as e:
@@ -196,7 +196,7 @@ async def get_schema(base_id: str, table_id: str):
     Called by the extension Jobs tab to populate the schema preview.
     """
     try:
-        from backend.clients.airtable_client import AirtableClient
+        from backend.crm.airtable import AirtableClient
 
         client = AirtableClient()
         schema = client.get_table_schema(base_id, table_id)
@@ -305,7 +305,7 @@ async def jobs_preflight(request: JobPreflightRequest):
     Returns preview info for the confirmation step — does NOT create anything in DB.
     """
     try:
-        from backend.clients.airtable_client import AirtableClient
+        from backend.crm.airtable import AirtableClient
         import math
 
         client = AirtableClient()
@@ -334,7 +334,7 @@ async def jobs_create(request: JobCreateRequest):
     """
     try:
         import math
-        from backend.clients.airtable_client import AirtableClient
+        from backend.crm.airtable import AirtableClient
         from backend.db.client import (
             get_field_mapping_by_id,
             get_active_job,
@@ -420,7 +420,7 @@ async def list_jobs(base_id: str, table_id: str):
 async def list_job_batches(job_id: int):
     """List all batches for a job. Lazily backfills stats from CSV for pre-stat-tracking batches."""
     from backend.db.client import get_batches, update_batch
-    from backend.enrichment.batch_executor import _csv_path, _read_processed_stats
+    from backend.pipeline.executor import _csv_path, _read_processed_stats
 
     try:
         batches = await get_batches(job_id)
@@ -477,7 +477,7 @@ async def run_job(job_id: int):
 
         await update_job_status(job_id, "running")
 
-        from backend.enrichment.executor_manager import get_manager
+        from backend.pipeline.manager import get_manager
 
         await get_manager().submit(job_id)
 
@@ -945,7 +945,7 @@ async def scrape_profile(request: ScrapeRequest):
 
         import uuid
         from backend.agents.workflows.enrichment import get_enrichment_workflow
-        from backend.clients.airtable_client import AirtableClient
+        from backend.crm.airtable import AirtableClient
         from backend.agents.tools.langchain_tools import get_airtable_schema
 
         record_id = request.context.recordId

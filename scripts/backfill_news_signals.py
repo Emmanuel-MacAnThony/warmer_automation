@@ -20,11 +20,11 @@ from typing import Any, Dict, List
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.clients.airtable_client import AirtableClient
-from backend.clients.serp_client import SerpClient
+from backend.crm.airtable import AirtableClient
+from backend.intelligence.news.client import NewsClient
 from backend.config import Config
 from backend.db import client as db
-from backend.enrichment.news_analyzer import parse_news_results
+from backend.intelligence.news.analyzer import parse_news_results
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,7 +34,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 _serp_semaphore = asyncio.Semaphore(5)
-_serp = SerpClient()
+_serp = NewsClient()
 _airtable = AirtableClient()
 
 
