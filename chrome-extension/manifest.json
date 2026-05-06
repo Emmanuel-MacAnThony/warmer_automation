@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Airtable AI Assistant",
+  "version": "1.0.0",
+  "description": "Smart AI assistant for Airtable CRM",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://airtable.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://airtable.com/*"],
+      "js": [
+        "modules/panel-manager.js",
+        "modules/storage.js",
+        "modules/panels/approval-panel.js",
+        "modules/panels/field-mapping-panel.js",
+        "content.js"
+      ],
+      "css": [
+        "styles/main.css",
+        "styles/panels.css"
+      ],
+      "run_at": "document_end"
+    }
+  ]
+}

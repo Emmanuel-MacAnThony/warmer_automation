@@ -33,6 +33,7 @@ twitter_analysis.json
 
 # Batch data output
 data/batches/
+workspace/data/batches/
 
 # Misc
 nul
