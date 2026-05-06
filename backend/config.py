@@ -6,14 +6,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from project root
-# __file__ is backend/config.py, so parent.parent gets to project root
-project_root = Path(__file__).parent.parent
-env_path = project_root / ".env"
+# Load environment variables from backend/.env
+env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
-
-# Also try to load from current directory as fallback
-load_dotenv()
 
 
 class Config:
