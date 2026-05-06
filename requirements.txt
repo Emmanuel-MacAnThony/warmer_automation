@@ -1,0 +1,20 @@
+# Core dependencies
+python-dotenv==1.0.0
+pyairtable==2.3.3
+openai>=1.30.0
+requests==2.31.0
+apify-client==1.7.1
+
+# Backend API
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+
+# LangGraph and LangChain - using compatible versions
+langgraph>=0.0.26
+langchain>=0.1.6
+langchain-openai>=0.0.5
+langchain-core>=0.1.25
+
+# Optional: for better error handling and retries
+tenacity==8.2.3

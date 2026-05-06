@@ -1,0 +1,38 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+venv_312/
+env/
+
+# Logs
+*.log
+enrichment.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test output files
+scraped_profile.json
+scraped_tweets.json
+crunchbase_profile.json
+twitter_analysis.json
+
+# Batch data output
+data/batches/
+
+# Misc
+nul
