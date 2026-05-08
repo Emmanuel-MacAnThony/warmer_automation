@@ -25,16 +25,16 @@ from tenacity import retry, stop_after_attempt, wait_exponential, wait_random
 from backend.config import Config
 from backend.crm.airtable import AirtableClient
 from backend.intelligence.linkedin.scraper import preserve_apify_data
-from backend.pipeline.linkedin_finder import LinkedInFinder
+from backend.pipeline.linkedin_resolver import LinkedInFinder
 from backend.intelligence.news.client import NewsClient
 from backend.agents.subagents.matching_agent import LLMMatcher
 from backend.db import client as db
 from backend.pipeline.apify_pool import get_pool
-from backend.pipeline.analyzer import (
+from backend.intelligence.linkedin.analyzer import (
     BatchAnalyzer, BatchOutputValidator,
-    PROFILE_SIGNAL_FIELDS, extract_career_progression,
+    PROFILE_SIGNAL_FIELDS, POST_SIGNAL_FIELDS,
+    extract_career_progression, extract_post_signals,
 )
-from backend.intelligence.linkedin.analyzer import extract_post_signals, POST_SIGNAL_FIELDS
 from backend.intelligence.news.analyzer import parse_news_results, NEWS_SIGNAL_FIELDS
 from backend.intelligence.twitter.analyzer import extract_tweet_signals, TWEET_SIGNAL_FIELDS
 # from backend.intelligence.crunchbase.scraper import scrape_crunchbase_profile  # Week 2
