@@ -325,6 +325,26 @@ LangGraph nodes:
 
 ---
 
+## First Scrape Behaviour
+
+First scrape establishes the baseline — no triggers fire because there is nothing
+to diff against yet. Outreach only becomes possible from the second scrape onwards.
+
+However, hot-tier contacts are **prioritised within the first scrape** — they go
+into the first batches so their baseline is rich and ready by the time the second
+weekly run hits them. Cold tier goes last.
+
+Implementation: add a `tier` field to each contact record in Airtable.
+The executor sorts by tier before batching on every run — same pipeline, same code.
+
+```
+tier field values: "hot" | "warm" | "cold"
+default on first enrichment: derived from wealth_confidence + signal count
+promoted/demoted automatically as signals change over time
+```
+
+---
+
 ## Open Questions
 
 - What signal threshold promotes a contact from cold → warm tier automatically?
