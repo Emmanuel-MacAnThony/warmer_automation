@@ -25,7 +25,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, wait_random
 from backend.config import Config
 from backend.crm.airtable import AirtableClient
 from backend.intelligence.linkedin.scraper import preserve_apify_data
-from backend.pipeline.linkedin_resolver import LinkedInFinder
+from backend.pipeline.resolvers.linkedin import LinkedInFinder
 from backend.intelligence.news.client import NewsClient
 from backend.agents.subagents.matching_agent import LLMMatcher
 from backend.db import client as db
