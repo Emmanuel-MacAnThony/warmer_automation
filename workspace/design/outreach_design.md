@@ -100,76 +100,210 @@ That timeline becomes the "why now" context the message drafter uses.
 
 ---
 
-## Outreach Queue
+## Outreach Queue — What the Fundraiser Sees
 
-The fundraiser opens their dashboard and sees triggers from the last refresh cycle:
+The fundraiser opens their dashboard and sees triggers from the last refresh cycle.
+Not a live stream — a weekly digest is enough.
 
-> *"5 contacts triggered this week"*
-> - Aaron Bird — new post mentioning climate tech (matches your cause)
-> - Jane Smith — Series B closed at her company (Crunchbase)
-> - Michael Chen — 3 news hits this week, up from 0
+```
+OUTREACH QUEUE  ·  5 this week
+────────────────────────────────────────────────────────────
+Aaron Bird         EXITED_FOUNDER  ·  High wealth
+                   🔔 New post about climate tech  ·  Warm path: Jeremiah
+                   [Review →]
 
-Not a live stream. A weekly digest is enough — fundraising doesn't need
-millisecond reaction time. Reacting within days of a trigger beats cold
-outreach with no trigger at all.
+Jane Smith         RSU_BENEFICIARY  ·  High wealth
+                   💰 Series B closed at her company (Crunchbase)
+                   [Review →]
 
----
-
-## Warm Path First
-
-If `intro_strength_score` is above threshold, the recommended action is never
-"send cold message" — it's "ask [team member] to introduce."
-
-The system drafts the intro request for the team member, not a cold message
-to the prospect. Cold outreach is the fallback when no warm path exists.
-
----
-
-## Message Drafting
-
-Draft generated from:
-- Enriched contact profile (wealth signals, topic themes, personality type, causes)
-- The triggering event (what happened, when)
-- Warm path (who's connecting, strength of connection)
-- Org mission and current campaign context
-- Fundraiser's own voice (few-shot examples from past approved messages)
-
-Opening must be specific to the person and the trigger — not generic.
-
-**Example with trigger:**
-> "Saw your post on Nanotronics' Series C — congratulations. The work you're doing
-> in advanced manufacturing aligns closely with something we're building..."
-
-HITL is non-negotiable. No outreach message leaves without human review and approval.
+Michael Chen       SENIOR_OPERATOR  ·  Medium wealth
+                   📰 3 news hits this week, up from 0
+                   [Review →]
+────────────────────────────────────────────────────────────
+```
 
 ---
 
-## Channel Selection
+## The Outreach Card — Warm Path Exists
 
-| Condition | Channel |
-|---|---|
-| Warm intro exists (intro_strength_score > threshold) | Intro request via email to mutual |
-| tweet_engagement_tier = High | Twitter DM |
-| post_engagement_tier = High | LinkedIn InMail |
-| Email available | Email |
-| Default | LinkedIn InMail |
+When clicking into a prospect, the fundraiser sees context first, then the draft.
 
-No auto-send via API. Correct UX: "Copy message" or "Open LinkedIn compose."
-Keeps human in the loop for the actual send.
+```
+┌──────────────────────────────────────────────────────────┐
+│  Aaron Bird                                              │
+│  CEO, Apexcel  ·  San Francisco                         │
+│  Wealth: High  ·  Trajectory: EXITED_FOUNDER            │
+├──────────────────────────────────────────────────────────┤
+│  WHY NOW                                                 │
+│  ● Posted about climate manufacturing 2 days ago        │
+│  ● 2 news hits this week (up from 0)                    │
+├──────────────────────────────────────────────────────────┤
+│  WARM PATH                                               │
+│  Jeremiah → Aaron Bird  (intro strength: Strong)        │
+├──────────────────────────────────────────────────────────┤
+│  INTRO REQUEST  →  Jeremiah                             │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │ Hi Jeremiah,                                       │  │
+│  │                                                    │  │
+│  │ Would you be able to intro me to Aaron Bird?       │  │
+│  │ He posted about climate manufacturing this week    │  │
+│  │ and I think there's a real alignment with our      │  │
+│  │ work at [Org]. Happy to give you more context.     │  │
+│  └────────────────────────────────────────────────────┘  │
+│  [Copy]  [Open Gmail]                                    │
+├──────────────────────────────────────────────────────────┤
+│  FALLBACK — if no intro in 5 days, cold message below   │
+│  [Show cold draft ↓]                                     │
+└──────────────────────────────────────────────────────────┘
+```
+
+When a warm path exists, the intro request is the primary action.
+Cold message is hidden behind "show fallback" — not presented as equal options.
 
 ---
 
-## Sequence Management
+## The Outreach Card — No Warm Path
 
-Fundraising sequences are short and personal — not sales cadences:
+When no intro path is found the system falls back to cold outreach.
+The trigger compensates for the missing intro — a strong trigger makes cold
+outreach feel relevant rather than random.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Jane Smith                                              │
+│  CFO, Vertex Capital  ·  New York                       │
+│  Wealth: High  ·  Trajectory: RSU_BENEFICIARY           │
+├──────────────────────────────────────────────────────────┤
+│  WHY NOW                                                 │
+│  💰 Series B closed at Vertex Capital (Crunchbase)      │
+│  📰 Featured in TechCrunch this week                    │
+├──────────────────────────────────────────────────────────┤
+│  WARM PATH                                               │
+│  ⚠ No warm path found                                   │
+├──────────────────────────────────────────────────────────┤
+│  COLD MESSAGE  ·  LinkedIn InMail                       │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │ Hi Jane,                                           │  │
+│  │                                                    │  │
+│  │ Congratulations on the Series B — well deserved    │  │
+│  │ given what Vertex has been building. I'm [Name]    │  │
+│  │ at [Org], and the timing feels right to share      │  │
+│  │ what we're working on. The alignment with your     │  │
+│  │ work in [field] is hard to ignore.                 │  │
+│  │                                                    │  │
+│  │ Would a 20-minute call work this month?            │  │
+│  └────────────────────────────────────────────────────┘  │
+│  [Edit]  [Regenerate]                                    │
+├──────────────────────────────────────────────────────────┤
+│  [Copy message]  [Open LinkedIn]  [Snooze 7d]  [Skip]   │
+└──────────────────────────────────────────────────────────┘
+```
+
+### When to go cold vs wait
+
+Not every trigger justifies cold outreach. The system applies this logic:
+
+| Trigger strength | Warm path | Action |
+|---|---|---|
+| High (funding event, giving signal, trajectory change) | Yes | Draft intro request |
+| High | No | Draft cold message — trigger is strong enough |
+| Medium (single news hit) | Yes | Draft intro request |
+| Medium | No | Flag as "wait for stronger trigger or find intro" — do not queue |
+| None (profile signals only) | Any | Do not queue — monitor only |
+
+The rule: **cold outreach without a trigger is spam. Cold outreach with a strong
+trigger is timely.** The trigger is doing the work the intro would otherwise do.
+
+---
+
+## Follow-Up — 10 Days Later
+
+After the fundraiser marks a message as sent, a follow-up item appears in
+the queue automatically.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  FOLLOW-UP DUE  ·  Aaron Bird                           │
+│  Contacted 10 days ago via LinkedIn InMail  ·  No reply │
+├──────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────┐  │
+│  │ Hi Aaron, just following up on my note last week.  │  │
+│  │ Still think the timing is right — happy to keep    │  │
+│  │ it brief if easier.                                │  │
+│  └────────────────────────────────────────────────────┘  │
+│  [Copy]  [Mark declined]  [Snooze 7d]  [Stop sequence]  │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## No Auto-Send — Ever
+
+The buttons are always:
+- **Copy message** — copies to clipboard, fundraiser pastes into LinkedIn or Gmail
+- **Open LinkedIn** — deep links to the contact's LinkedIn profile
+- **Open Gmail** — opens a mailto: link with To, Subject, Body pre-filled
+
+The message must come from the fundraiser's real account, not an API call.
+Reasons: deliverability, platform ToS, trust, liability.
+
+The system is a drafting and staging tool. The fundraiser is always the sender.
+
+---
+
+## Outreach Item Data Model
+
+```python
+{
+  "contact_id":         "recXXX",
+  "trigger_type":       "giving_signal_appeared",
+  "trigger_detail":     "Posted about climate manufacturing 2 days ago",
+  "trigger_strength":   "high",           # high / medium / low
+  "channel":            "linkedin_inmail",
+  "warm_path_contact":  "Jeremiah",       # null if no warm path
+  "intro_strength":     "strong",         # null if no warm path
+  "draft_message":      "...",
+  "intro_draft":        "...",            # null if no warm path
+  "status":             "queued",         # queued → sent → responded / declined / cooling
+  "sent_at":            null,
+  "followup_due_at":    null,
+  "sequence_step":      1,               # 1 = initial, 2 = first follow-up, 3 = final touch
+  "notes":              ""
+}
+```
+
+---
+
+## Contact Stage Lifecycle
+
+`outreach_status` field in Airtable:
+
+```
+not_started → queued → contacted → responded → meeting_booked → donated
+                                 ↘ declined → cooling (90 days) → not_started
+```
+
+---
+
+## Sequence Cadence
 
 1. Initial outreach
-2. One follow-up at 10 days if no response
-3. One final touch at 21 days
+2. Follow-up at 10 days if no response
+3. Final touch at 21 days
 4. Cool-down: 90 days minimum before re-engaging
 
-Contact stage tracked in Airtable:
-`outreach_status`: not_started → contacted → responded → meeting_booked → declined → cooling
+Fundraising sequences are short and personal — not sales cadences.
+
+---
+
+## UX Principles
+
+1. **Context before message** — fundraiser sees why this person, why now, before seeing the draft
+2. **Warm path surfaces first** — intro request is the primary action; cold message is the fallback
+3. **Trigger gates cold outreach** — no trigger, no cold message queued
+4. **One at a time** — not a list to blast through; deliberate, high-value contact
+5. **Snooze matters** — fundraiser may want to wait; snoozed contact returns at the right moment
+6. **System drafts, human sends** — HITL throughout, no exceptions
 
 ---
 
@@ -186,8 +320,7 @@ backend/outreach/
     └── outreach.py  — LangGraph workflow (mirrors enrichment.py shape)
 ```
 
-The LangGraph workflow follows the same interrupt/resume pattern as
-`agents/workflows/enrichment.py`. Nodes:
+LangGraph nodes:
 `prioritize → detect_trigger → select_channel → find_warm_path → draft → hitl_review → log_to_airtable → schedule_followup`
 
 ---
@@ -198,3 +331,4 @@ The LangGraph workflow follows the same interrupt/resume pattern as
 - How is "org mission + current campaign" context injected into the drafter?
 - Does the fundraiser configure their own voice examples, or does the system learn from approved messages over time?
 - Where does sequence state live — Airtable fields or internal DB?
+- How does the system handle a response that comes in — manual logging or email/LinkedIn integration?
