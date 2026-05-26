@@ -164,8 +164,8 @@ export function JobPipeline({
     // Inferred active states: show spinner whenever we know a step must be running
     // even if we haven't polled the run record yet (fast steps finish before first poll)
     const dedupActive = dedup.active || (dedupRun == null && jobRunning && !dedupFailed);
-    const wpActive    = wp.active    || (wpRun    == null && enrichDone     && !wpDone  && wpRun?.status !== "failed");
-    const embActive   = emb.active   || (embRun   == null && enrichDone     && !embDone && embRun?.status !== "failed");
+    const wpActive    = wp.active    || (wpRun    == null && enrichDone     && !wpDone);
+    const embActive   = emb.active   || (embRun   == null && enrichDone     && !embDone);
 
     const wpProgress = (() => {
         if (!wp.active) return null;

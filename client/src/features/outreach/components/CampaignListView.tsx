@@ -3,7 +3,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
 import { ConfirmDialog } from "@/shared/components/ui/dialog";
 import { cn } from "@/shared/lib/utils";
-import { Loader2, Mail, Plus, Target, Repeat } from "lucide-react";
+import { Mail, Plus, Target, Repeat } from "lucide-react";
 import type { Tier } from "../types";
 import { useOutreachContext } from "../context/OutreachContext";
 import { CampaignCard } from "./CampaignCard";

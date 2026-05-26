@@ -1,6 +1,6 @@
 import { WifiOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Button } from '@/shared/components/ui/button'
+// import { Button } from '@/shared/components/ui/button'  // re-enable with theme toggle below
 import { api } from '@/shared/api/client'
 
 interface TopBarProps {
@@ -8,7 +8,7 @@ interface TopBarProps {
   onThemeToggle: () => void
 }
 
-export function TopBar({ theme, onThemeToggle }: TopBarProps) {
+export function TopBar(_props: TopBarProps) {
   const [online, setOnline] = useState<boolean | null>(null)
 
   useEffect(() => {

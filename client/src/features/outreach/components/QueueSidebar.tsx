@@ -4,7 +4,7 @@ import { useOutreachContext } from "../context/OutreachContext";
 
 export function QueueSidebar() {
     const {
-        activeCampaign, activeTier,
+        activeTier,
         setView, enterBatch,
         actioning, queue, queueIdx, setQueueIdx,
         queueTotal, sentinelRef, loadingMore, sidebarW,

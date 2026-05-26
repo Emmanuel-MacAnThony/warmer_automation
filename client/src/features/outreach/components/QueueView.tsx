@@ -10,7 +10,7 @@ export function QueueView() {
         queue, queueIdx, actioning,
         activeTier, setView, setShowSignals,
         enterBatch,
-        sidebarW, startDrag,
+        startDrag,
     } = useOutreachContext();
 
     const tierLabel = activeTier === "tier_1" ? "Tier 1" : activeTier === "tier_2" ? "Tier 2" : "Tier 3";

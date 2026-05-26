@@ -71,11 +71,11 @@ export function SignalsDrawer() {
                                                         )}
                                                     </>
                                                 ) : (() => {
-                                                    const raw = signals![key as keyof typeof signals]
-                                                    const items = Array.isArray(raw)
+                                                    const raw = signals![key as keyof typeof signals] as unknown
+                                                    const items: string[] | null = Array.isArray(raw)
                                                         ? raw as string[]
                                                         : typeof raw === 'string' && raw.startsWith('[')
-                                                            ? (raw.replace(/^\[|\]$/g, '').split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean))
+                                                            ? (raw.replace(/^\[|\]$/g, '').split(',').map((s: string) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean))
                                                             : null
                                                     return items ? (
                                                         <div className="flex flex-wrap gap-1 mt-0.5">
