@@ -53,3 +53,6 @@ workspace/data/
 /*.png
 backend.log
 /chrome-extension/
+
+# Internal scripts/docs — not for the deploy repo
+/workspace/
