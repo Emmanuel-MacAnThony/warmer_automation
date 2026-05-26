@@ -14,7 +14,7 @@ import asyncio
 import logging
 from typing import Dict
 
-from backend.db import client as db
+from backend.infra.db import client as db
 from backend.pipeline.executor import BatchExecutor
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,12 @@ class ExecutorManager:
         try:
             executor = BatchExecutor()
             await executor.run_job(job)
+
+            # Check if job completed successfully before triggering downstream pipeline
+            completed_job = await db.get_job(job_id)
+            if completed_job and completed_job["status"] == "completed":
+                await self._trigger_post_enrichment(completed_job)
+
         except asyncio.CancelledError:
             # Server shutdown — leave status as "running" so auto_resume picks it up on restart.
             # (User-initiated pauses are set via DB polling in BatchExecutor, not here.)
@@ -68,6 +74,44 @@ class ExecutorManager:
             await db.update_job_status(job_id, "failed")
         finally:
             self._tasks.pop(job_id, None)
+
+    async def _trigger_post_enrichment(self, job: dict) -> None:
+        """
+        Fire warm path + embedding indexing after a job completes.
+        Both run independently — a failure in one does not affect the other.
+        """
+        job_id = job["id"]
+        base_id = job["base_id"]
+        table_id = job["table_id"]
+
+        logger.info(f"Job {job_id}: triggering post-enrichment pipeline (warm path + embedding)")
+
+        from backend.pipeline.warmpath_executor import run as run_warm_path
+        from backend.pipeline.embedding_executor import run as run_embedding
+
+        asyncio.create_task(
+            _safe_run(
+                run_warm_path(
+                    base_id=base_id,
+                    table_id=table_id,
+                    triggered_by="auto",
+                    enrichment_job_id=job_id,
+                ),
+                label=f"warm_path job={job_id}",
+            )
+        )
+
+        asyncio.create_task(
+            _safe_run(
+                run_embedding(
+                    base_id=base_id,
+                    table_id=table_id,
+                    triggered_by="auto",
+                    enrichment_job_id=job_id,
+                ),
+                label=f"embedding job={job_id}",
+            )
+        )
 
     async def auto_resume(self) -> int:
         """
@@ -102,6 +146,18 @@ class ExecutorManager:
     @property
     def running_job_ids(self):
         return [jid for jid, t in self._tasks.items() if not t.done()]
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+async def _safe_run(coro, label: str) -> None:
+    """Run a coroutine as a fire-and-forget task, logging any failure without propagating."""
+    try:
+        await coro
+    except Exception as e:
+        logger.error(f"Post-enrichment task '{label}' failed: {e}", exc_info=True)
 
 
 # ---------------------------------------------------------------------------

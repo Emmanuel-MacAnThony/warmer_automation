@@ -1,18 +1,22 @@
-"""Multi-agent system for CRM automation"""
-from backend.agents.orchestrator import CRMOrchestrator, get_orchestrator
-from backend.agents.workflows.enrichment import EnrichmentWorkflow, get_enrichment_workflow
-from backend.agents.subagents.linkedin_agent import LinkedInAnalyzerAgent, analyze_linkedin_for_airtable
-from backend.agents.state.agent_state import EnrichmentState, BatchEnrichmentState
-from backend.agents.state.orchestrator_state import OrchestratorState
+"""
+AI Agents
+
+  outreach/    — Email generation agent (Generate → Critique → Rewrite ReAct loop)
+  segmentation/ — Campaign segmentation agent (LangGraph scoring pipeline)
+  enrichment/  — LinkedIn profile matching agent (LLM-ranked SERP candidates)
+"""
+from backend.agents.outreach import generate_streaming, generate_tier_insight, generate
+from backend.agents.segmentation import run_segmentation, register, unregister, get_queue, SENTINEL
+from backend.agents.enrichment import LLMMatcher
 
 __all__ = [
-    'CRMOrchestrator',
-    'get_orchestrator',
-    'EnrichmentWorkflow',
-    'get_enrichment_workflow',
-    'LinkedInAnalyzerAgent',
-    'analyze_linkedin_for_airtable',
-    'EnrichmentState',
-    'BatchEnrichmentState',
-    'OrchestratorState'
+    "generate_streaming",
+    "generate_tier_insight",
+    "generate",
+    "run_segmentation",
+    "register",
+    "unregister",
+    "get_queue",
+    "SENTINEL",
+    "LLMMatcher",
 ]

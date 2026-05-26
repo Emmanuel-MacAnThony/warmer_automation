@@ -9,6 +9,9 @@ apify-client==1.7.1
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 pydantic==2.5.3
+python-multipart==0.0.29
+pypdf>=4.0.0
+python-docx>=1.1.0
 
 # LangGraph and LangChain - using compatible versions
 langgraph>=0.0.26
@@ -18,3 +21,7 @@ langchain-core>=0.1.25
 
 # Optional: for better error handling and retries
 tenacity==8.2.3
+
+# Gmail OAuth
+google-auth-oauthlib>=1.4.0
+google-api-python-client>=2.196.0

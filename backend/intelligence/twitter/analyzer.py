@@ -21,12 +21,10 @@ Output fields:
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
-
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
+from typing import Any, Dict, List
 
 from backend.config import Config
+from backend.infra.llm import LLMProvider
 from backend.intelligence.shared.keywords import (
     WEALTH_SIGNAL_TERMS,
     GIVING_SIGNAL_TERMS,
@@ -106,19 +104,16 @@ def pre_filter_tweets(tweets: List[Dict]) -> List[Dict]:
 # Step 2 — LLM extraction
 # ---------------------------------------------------------------------------
 
-async def analyze_tweets(tweets: List[Dict], llm: Optional[ChatOpenAI] = None) -> Dict[str, Any]:
+async def analyze_tweets(tweets: List[Dict], provider: LLMProvider | None = None) -> Dict[str, Any]:
     """
     Run the filtered tweets through the LLM and return the signal fields.
     """
     if not tweets:
         return {}
 
-    if llm is None:
-        llm = ChatOpenAI(
-            model=Config.OPENAI_MODEL,
-            temperature=0.1,
-            api_key=Config.OPENAI_API_KEY,
-        )
+    if provider is None:
+        from backend.infra.llm.factory import get_llm_provider
+        provider = get_llm_provider()
 
     slim_tweets = [
         {
@@ -181,15 +176,18 @@ Extract these 6 fields as a JSON object:
 Return ONLY a valid JSON object. Omit any field you cannot confidently populate."""
 
     messages = [
-        SystemMessage(content=(
-            "You extract structured signals from Twitter/X posts for fundraising teams. "
-            "Respond with valid JSON only — no markdown, no explanation."
-        )),
-        HumanMessage(content=prompt),
+        {
+            "role": "system",
+            "content": (
+                "You extract structured signals from Twitter/X posts for fundraising teams. "
+                "Respond with valid JSON only — no markdown, no explanation."
+            ),
+        },
+        {"role": "user", "content": prompt},
     ]
 
-    response = await llm.ainvoke(messages)
-    return _parse(response.content)
+    result = await provider.complete(messages, model=Config.OPENAI_MODEL, temperature=0.1)
+    return _parse(result)
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +215,7 @@ def build_analyzed_links(tweets: List[Dict]) -> str:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-async def extract_tweet_signals(raw_tweets: List[Dict], llm: Optional[ChatOpenAI] = None) -> Dict[str, Any]:
+async def extract_tweet_signals(raw_tweets: List[Dict], provider: LLMProvider | None = None) -> Dict[str, Any]:
     """
     Full pipeline: filter → LLM extract → build metadata.
     Returns a dict ready to merge into the Airtable field update.
@@ -226,7 +224,7 @@ async def extract_tweet_signals(raw_tweets: List[Dict], llm: Optional[ChatOpenAI
         return {}
 
     filtered = pre_filter_tweets(raw_tweets)
-    signals  = await analyze_tweets(filtered, llm=llm)
+    signals  = await analyze_tweets(filtered, provider=provider)
     signals["tweet_analyzed_links"] = build_analyzed_links(filtered)
     return signals
 
