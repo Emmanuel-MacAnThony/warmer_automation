@@ -326,13 +326,14 @@ async def get_sequence_stats(sequence_id: int) -> dict[str, Any]:
         )
         step_rows = await conn.fetch(
             """
-            SELECT current_step, COUNT(*) AS n
+            SELECT current_step, COUNT(*) AS n, MIN(next_send_at) AS next_at
             FROM sequence_enrollments WHERE sequence_id=$1 AND status='active'
             GROUP BY current_step ORDER BY current_step
             """,
             sequence_id,
         )
     by_status = {r["status"]: r["n"] for r in status_rows}
+    next_dt = [r["next_at"] for r in step_rows if r["next_at"] is not None]
     return {
         "total":     sum(by_status.values()),
         "active":    by_status.get("active", 0),
@@ -341,6 +342,11 @@ async def get_sequence_stats(sequence_id: int) -> dict[str, Any]:
         "stopped":   by_status.get("stopped", 0),
         "bounced":   by_status.get("bounced", 0),
         "by_step":   {r["current_step"]: r["n"] for r in step_rows},
+        "next_by_step": {
+            r["current_step"]: r["next_at"].isoformat()
+            for r in step_rows if r["next_at"] is not None
+        },
+        "next_send_at": min(next_dt).isoformat() if next_dt else None,
     }
 
 

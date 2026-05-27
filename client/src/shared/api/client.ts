@@ -191,6 +191,8 @@ export interface SequenceStats {
   stopped: number
   bounced: number
   by_step: Record<string, number>
+  next_by_step?: Record<string, string>  // step → ISO timestamp of next scheduled send
+  next_send_at?: string | null            // earliest upcoming send across all steps (ISO)
 }
 
 export interface SequenceStep {

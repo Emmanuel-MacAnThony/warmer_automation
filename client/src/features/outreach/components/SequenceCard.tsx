@@ -1,10 +1,28 @@
 import { api, type Sequence, type SequenceReply } from "@/shared/api/client";
 import { Card } from "@/shared/components/ui/card";
 import { cn } from "@/shared/lib/utils";
-import { ChevronRight, Layers, Loader2, Pause, Play, Trash2 } from "lucide-react";
+import { ChevronRight, Clock, Layers, Loader2, Pause, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { TIER_ROWS } from "../constants";
 import { sentenceCase } from "../utils";
+
+// Exact local time, e.g. "Wed, 28 May, 9:14 AM"
+function fmtAbs(iso: string): string {
+    return new Date(iso).toLocaleString(undefined, {
+        weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
+    });
+}
+
+// Human relative hint from now: "any moment" | "in 12m" | "in 3h" | "in 2d"
+function fmtRel(iso: string): string {
+    const ms = new Date(iso).getTime() - Date.now();
+    if (ms <= 60_000) return "any moment";
+    const mins = Math.round(ms / 60_000);
+    if (mins < 60) return `in ${mins}m`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `in ${hrs}h`;
+    return `in ${Math.round(hrs / 24)}d`;
+}
 
 const STATUS_STYLE: Record<string, string> = {
     active:    "text-emerald-400 bg-emerald-500/10 border-emerald-500/25",
@@ -100,6 +118,32 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
                 })}
             </div>
 
+            {/* Next-send summary — when the next batch goes out + reply rate */}
+            {(seq.status === "active" || seq.status === "paused") && s.total > 0 && (
+                <div className="flex items-center gap-2 px-4 py-2 border-t border-border/40 text-[11px]">
+                    {seq.status === "paused" ? (
+                        <span className="flex items-center gap-1.5 text-amber-500/70">
+                            <Clock size={11} /> Paused — sending is on hold
+                        </span>
+                    ) : s.next_send_at ? (
+                        <span className="flex items-center gap-1.5 text-foreground/70">
+                            <Clock size={11} className="text-primary/60" />
+                            Next send <span className="font-medium text-foreground/90">{fmtAbs(s.next_send_at)}</span>
+                            <span className="text-muted-foreground/45">· {fmtRel(s.next_send_at)}</span>
+                        </span>
+                    ) : (
+                        <span className="flex items-center gap-1.5 text-muted-foreground/50">
+                            <Clock size={11} /> No more sends scheduled
+                        </span>
+                    )}
+                    {s.replied > 0 && (
+                        <span className="ml-auto font-mono text-emerald-500/70 tabular-nums" title={`${s.replied} of ${s.total} replied`}>
+                            {Math.round((s.replied / s.total) * 100)}% replied
+                        </span>
+                    )}
+                </div>
+            )}
+
             {/* Hot leads — who replied */}
             {showReplies && (
                 <div className="border-t border-emerald-500/15 bg-emerald-500/5 px-4 py-2.5">
@@ -129,17 +173,22 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
                     <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/40">Steps</span>
                     {seq.step_previews!.map((st) => {
                         const waiting = s.by_step[String(st.step_number)] ?? 0;
-                        const when = st.step_number === 1 ? "sends first" : `+${st.delay_days}d after prev`;
+                        const sched = s.next_by_step?.[String(st.step_number)];
+                        // Exact time when contacts are actually queued at this step;
+                        // otherwise a projection (no one has reached it yet).
+                        const when = sched
+                            ? fmtAbs(sched)
+                            : st.step_number === 1 ? "sends first" : `~+${st.delay_days}d after prev`;
                         return (
                             <div key={st.step_number} className="flex items-center gap-2 text-[11px]">
                                 <span className="h-4 w-4 rounded-full bg-muted/60 text-muted-foreground/70 text-[9px] font-mono flex items-center justify-center shrink-0">{st.step_number}</span>
                                 <span className="flex-1 min-w-0 truncate text-foreground/70" title={st.subject}>
                                     {st.step_number === 1 ? "" : "↳ "}{st.subject || "(no subject)"}
                                 </span>
-                                <span className="text-[9px] font-mono text-muted-foreground/40 shrink-0">{when}</span>
+                                <span className={cn("text-[9px] font-mono shrink-0", sched ? "text-foreground/55" : "text-muted-foreground/35 italic")}>{when}</span>
                                 {waiting > 0 && (
-                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary shrink-0" title="contacts waiting on this step">
-                                        {waiting} waiting
+                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary shrink-0" title="Contacts queued for this step — excludes anyone who replied or was stopped">
+                                        {waiting} will send
                                     </span>
                                 )}
                             </div>
