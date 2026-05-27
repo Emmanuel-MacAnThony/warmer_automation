@@ -169,11 +169,39 @@ async def enroll_tier(sequence_id: int, campaign_id: int, tier: str, scope: str 
 
 async def get_due_enrollments(limit: int = 200) -> list[dict[str, Any]]:
     """
-    Scheduler hot query: active enrollments whose next step is due, in active
-    sequences. Joins the contact + sequence data needed to send the step.
+    Scheduler hot query: atomically *claim* active enrollments whose next step is
+    due, in active sequences, then return the contact + sequence data to send them.
+
+    The claim leases each row by pushing next_send_at 15 minutes into the future in
+    a single locked statement (FOR UPDATE SKIP LOCKED). This makes it safe to run
+    more than one scheduler against the same database (e.g. local + prod sharing one
+    Neon DB): two workers can never grab the same enrollment, so no contact is
+    emailed twice. A crashed worker's lease simply expires and the row is retried.
     """
     pool = await get_pool()
     async with pool.acquire() as conn:
+        claimed = await conn.fetch(
+            """
+            UPDATE sequence_enrollments
+            SET next_send_at = now() + interval '15 minutes'
+            WHERE id IN (
+                SELECT se.id
+                FROM sequence_enrollments se
+                JOIN sequences s ON s.id = se.sequence_id
+                WHERE se.status = 'active'
+                  AND se.next_send_at <= now()
+                  AND s.status = 'active'
+                ORDER BY se.next_send_at
+                LIMIT $1
+                FOR UPDATE SKIP LOCKED
+            )
+            RETURNING id
+            """,
+            limit,
+        )
+        if not claimed:
+            return []
+        ids = [r["id"] for r in claimed]
         rows = await conn.fetch(
             """
             SELECT se.id              AS enrollment_id,
@@ -190,13 +218,10 @@ async def get_due_enrollments(limit: int = 200) -> list[dict[str, Any]]:
             FROM sequence_enrollments se
             JOIN campaign_contacts cc ON cc.id = se.campaign_contact_id
             JOIN sequences s          ON s.id  = se.sequence_id
-            WHERE se.status = 'active'
-              AND se.next_send_at <= now()
-              AND s.status = 'active'
+            WHERE se.id = ANY($1::int[])
             ORDER BY se.next_send_at
-            LIMIT $1
             """,
-            limit,
+            ids,
         )
     return [_due_row(r) for r in rows]
 
