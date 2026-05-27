@@ -1,5 +1,6 @@
 import {
     api,
+    API_BASE,
     type BatchEmailJob,
     type Campaign,
     type CampaignContact,
@@ -175,7 +176,7 @@ export function useOutreach(): OutreachContextValue & { baseId: string | null; t
     // Segmentation SSE
     useEffect(() => {
         if (view !== "segmenting" || !activeCampaign) return;
-        const es = new EventSource(`/api/campaigns/${activeCampaign.id}/events`);
+        const es = new EventSource(`${API_BASE}/campaigns/${activeCampaign.id}/events`);
         es.onmessage = async (e) => {
             const event: SegmentationEvent = JSON.parse(e.data);
             if (event.type === "done") { es.close(); return; }

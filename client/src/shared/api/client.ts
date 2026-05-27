@@ -1,6 +1,10 @@
 // Dev: '/api' via the Vite proxy. Prod: set VITE_API_URL to the backend's URL.
 const BASE = import.meta.env.VITE_API_URL ?? '/api'
 
+// Exported so EventSource/SSE callers resolve the same base (relative proxy in
+// dev, absolute backend URL in prod) instead of hardcoding '/api'.
+export const API_BASE = BASE
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response
   try {

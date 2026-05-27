@@ -1,4 +1,4 @@
-import { api, type BatchSendJob, type CampaignTemplate, type EmailProviderInfo, type GmailAccount, type PreviewContact, type ScopeCounts } from "@/shared/api/client";
+import { api, API_BASE, type BatchSendJob, type CampaignTemplate, type EmailProviderInfo, type GmailAccount, type PreviewContact, type ScopeCounts } from "@/shared/api/client";
 import { ENRICHED_BLOCKLIST, FIELD_GROUPS } from "../constants";
 import { withFallbacks } from "../utils";
 import { toast } from "@/shared/lib/toast";
@@ -224,7 +224,7 @@ export function useBatchView({
             setCurrentContact("");
             return;
         }
-        const url = `/api/campaigns/${campaign.id}/batch-jobs/${activeJob.id}/events`;
+        const url = `${API_BASE}/campaigns/${campaign.id}/batch-jobs/${activeJob.id}/events`;
         const source = new EventSource(url);
 
         source.onmessage = (e) => {
@@ -314,7 +314,7 @@ export function useBatchView({
     };
 
     const handleConnectAccount = () => {
-        const popup = window.open("/api/auth/gmail", "gmail-oauth", "width=520,height=620,scrollbars=yes,resizable=yes");
+        const popup = window.open(`${API_BASE}/auth/gmail`, "gmail-oauth", "width=520,height=620,scrollbars=yes,resizable=yes");
         const onMessage = (e: MessageEvent) => {
             if (e.data?.type !== "gmail-oauth") return;
             window.removeEventListener("message", onMessage);
@@ -414,7 +414,7 @@ export function useBatchView({
 
     // Generate one follow-up email (a fresh template). Returns id + subject + body.
     const generateFollowUp = async (followUpNumber: number): Promise<{ id: number; subject: string; body: string } | null> => {
-        const res = await fetch(`/api/campaigns/${campaign.id}/templates/${tier}/generate`, {
+        const res = await fetch(`${API_BASE}/campaigns/${campaign.id}/templates/${tier}/generate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -523,7 +523,7 @@ export function useBatchView({
         setSubjectVariants([]);
         try {
             const res = await fetch(
-                `/api/campaigns/${campaign.id}/templates/${tier}/generate`,
+                `${API_BASE}/campaigns/${campaign.id}/templates/${tier}/generate`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
