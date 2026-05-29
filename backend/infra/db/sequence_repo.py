@@ -292,6 +292,17 @@ async def advance_enrollment(
         )
 
 
+async def count_active_enrollments(sequence_id: int) -> int:
+    """How many enrollments are still moving through this sequence."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COUNT(*) AS n FROM sequence_enrollments WHERE sequence_id=$1 AND status='active'",
+            sequence_id,
+        )
+    return int(row["n"]) if row else 0
+
+
 async def finish_enrollment(enrollment_id: int, status: str = "completed",
                             message_id: Optional[str] = None, thread_id: Optional[str] = None) -> None:
     """Terminal state: completed | replied | stopped | bounced."""

@@ -53,11 +53,57 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
     };
 
     const metrics = [
-        { label: "Active",  value: s.active,    color: "text-primary" },
-        { label: "Replied", value: s.replied,   color: s.replied > 0 ? "text-emerald-500" : "text-muted-foreground/50" },
-        { label: "Done",    value: s.completed, color: "text-muted-foreground/70" },
-        { label: "Stopped", value: s.stopped,   color: s.stopped > 0 ? "text-amber-500/70" : "text-muted-foreground/50" },
+        { label: "Active",  value: s.active,    color: "text-primary",
+          hint: "Contacts still in the pipeline — includes those waiting between steps (e.g. between send 1 and the 3-day follow-up)." },
+        { label: "Replied", value: s.replied,   color: s.replied > 0 ? "text-emerald-500" : "text-muted-foreground/50",
+          hint: "Replied — sequence stopped for them." },
+        { label: "Done",    value: s.completed, color: "text-muted-foreground/70",
+          hint: "Reached the final step." },
+        { label: "Stopped", value: s.stopped,   color: s.stopped > 0 ? "text-amber-500/70" : "text-muted-foreground/50",
+          hint: "Stopped (no deliverable address, bounce, or template missing)." },
     ];
+
+    // Per-step schedule. Anchor on the first step that has a REAL next_send_at
+    // (contacts actually queued there). Steps AFTER the anchor are projected
+    // forward using each step's delay_days; steps BEFORE it are 'sent' (everyone
+    // advanced past them). When no real anchor exists, fall back to the relative
+    // cadence text — we never fake a clock time from now().
+    const DAY = 86_400_000;
+    const ordered = [...(seq.step_previews ?? [])].sort((a, b) => a.step_number - b.step_number);
+    type Sched = { label: string; tone: "scheduled" | "projected" | "sent" | "idle" };
+    const schedule = new Map<number, Sched>();
+    let firstAnchorStep: number | null = null;
+    let prevT: number | null = null;
+    for (const st of ordered) {
+        const real = s.next_by_step?.[String(st.step_number)];
+        if (real) {
+            if (firstAnchorStep === null) firstAnchorStep = st.step_number;
+            prevT = new Date(real).getTime();
+            schedule.set(st.step_number, { label: fmtAbs(real), tone: "scheduled" });
+        } else if (prevT !== null) {
+            const t: number = prevT + st.delay_days * DAY;
+            prevT = t;
+            schedule.set(st.step_number, { label: "~" + fmtAbs(new Date(t).toISOString()), tone: "projected" });
+        } else {
+            schedule.set(st.step_number, {
+                label: st.step_number === 1 ? "sends first" : `+${st.delay_days}d after prev`,
+                tone: "idle",
+            });
+        }
+    }
+    if (firstAnchorStep !== null) {
+        for (const st of ordered) {
+            if (st.step_number < firstAnchorStep) {
+                schedule.set(st.step_number, { label: "sent", tone: "sent" });
+            }
+        }
+    }
+    const SCHED_TONE: Record<Sched["tone"], string> = {
+        scheduled: "text-foreground/60",
+        projected: "text-muted-foreground/45",
+        sent:      "text-muted-foreground/35",
+        idle:      "text-muted-foreground/35 italic",
+    };
 
     return (
         <Card className="overflow-hidden w-full">
@@ -106,7 +152,7 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
                                 "flex-1 flex flex-col items-center justify-center px-3 py-3 transition-colors",
                                 clickable ? "hover:bg-emerald-500/5 cursor-pointer" : "cursor-default",
                             )}
-                            title={clickable ? "View who replied" : undefined}
+                            title={clickable ? "View who replied" : m.hint}
                         >
                             <p className={cn("text-sm font-semibold tabular-nums leading-none", m.color)}>{m.value.toLocaleString()}</p>
                             <p className="font-mono text-[9px] text-muted-foreground/40 tracking-widest uppercase mt-1 flex items-center gap-0.5">
@@ -171,21 +217,20 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
             {(seq.step_previews?.length ?? 0) > 0 && (
                 <div className="px-4 py-2.5 border-t border-border/40 space-y-1.5">
                     <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/40">Steps</span>
-                    {seq.step_previews!.map((st) => {
+                    {ordered.map((st) => {
                         const waiting = s.by_step[String(st.step_number)] ?? 0;
-                        const sched = s.next_by_step?.[String(st.step_number)];
-                        // Exact time when contacts are actually queued at this step;
-                        // otherwise a projection (no one has reached it yet).
-                        const when = sched
-                            ? fmtAbs(sched)
-                            : st.step_number === 1 ? "sends first" : `~+${st.delay_days}d after prev`;
+                        const sched = schedule.get(st.step_number) ?? { label: "", tone: "idle" as const };
+                        const tip = sched.tone === "scheduled" ? "Scheduled send time"
+                            : sched.tone === "projected" ? `Projected — estimated as ${st.delay_days}d after the previous step's real send time`
+                            : sched.tone === "sent" ? "Already sent (everyone advanced past this step)"
+                            : undefined;
                         return (
                             <div key={st.step_number} className="flex items-center gap-2 text-[11px]">
                                 <span className="h-4 w-4 rounded-full bg-muted/60 text-muted-foreground/70 text-[9px] font-mono flex items-center justify-center shrink-0">{st.step_number}</span>
                                 <span className="flex-1 min-w-0 truncate text-foreground/70" title={st.subject}>
                                     {st.step_number === 1 ? "" : "↳ "}{st.subject || "(no subject)"}
                                 </span>
-                                <span className={cn("text-[9px] font-mono shrink-0", sched ? "text-foreground/55" : "text-muted-foreground/35 italic")}>{when}</span>
+                                <span className={cn("text-[9px] font-mono shrink-0", SCHED_TONE[sched.tone])} title={tip}>{sched.label}</span>
                                 {waiting > 0 && (
                                     <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary shrink-0" title="Contacts queued for this step — excludes anyone who replied or was stopped">
                                         {waiting} will send

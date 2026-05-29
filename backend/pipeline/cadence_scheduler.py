@@ -132,6 +132,16 @@ async def tick() -> int:
             # Per-sender rate limit
             await asyncio.sleep(getattr(sender, "rate_limit_ms", 200) / 1000)
 
+        # Sequence is done when no enrollments are still 'active' (all completed,
+        # replied, stopped, or bounced). Flip the badge so the UI reflects reality
+        # instead of forever showing 'active' for an empty sequence.
+        try:
+            if await seq_repo.count_active_enrollments(seq_id) == 0:
+                await seq_repo.set_sequence_status(seq_id, "completed")
+                logger.info(f"[cadence seq={seq_id}] all enrollments done — sequence marked completed")
+        except Exception as e:
+            logger.warning(f"[cadence seq={seq_id}] could not auto-complete: {e}")
+
     for cid in touched_campaigns:
         try:
             await sync_campaign_sent_count(cid)
