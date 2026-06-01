@@ -303,6 +303,34 @@ async def count_active_enrollments(sequence_id: int) -> int:
     return int(row["n"]) if row else 0
 
 
+async def complete_finished_sequences() -> int:
+    """
+    Mark any 'active' sequence whose enrollments are all in terminal states
+    (no rows left with status='active') as 'completed'.
+
+    Runs every tick as a cheap sweep. Catches sequences that finished in a prior
+    tick or via reply detection — where the in-line per-sequence check wouldn't
+    fire because there are no more due rows for them.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            """
+            UPDATE sequences
+            SET status = 'completed', updated_at = now()
+            WHERE status = 'active'
+              AND NOT EXISTS (
+                  SELECT 1 FROM sequence_enrollments
+                  WHERE sequence_id = sequences.id AND status = 'active'
+              )
+            """
+        )
+    try:
+        return int(result.split()[-1])
+    except (ValueError, IndexError):
+        return 0
+
+
 async def finish_enrollment(enrollment_id: int, status: str = "completed",
                             message_id: Optional[str] = None, thread_id: Optional[str] = None) -> None:
     """Terminal state: completed | replied | stopped | bounced."""

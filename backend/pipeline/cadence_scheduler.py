@@ -59,6 +59,16 @@ async def _send_one(sender, due: dict, template: dict, test_recipient: Optional[
 
 async def tick() -> int:
     """Process one batch of due enrollments. Returns number of steps sent."""
+    # Reap: flip any 'active' sequence with no remaining active enrollments to
+    # 'completed'. Runs BEFORE the early-return below so it still fires on idle
+    # ticks — that's exactly the case where stuck-active sequences live.
+    try:
+        reaped = await seq_repo.complete_finished_sequences()
+        if reaped:
+            logger.info(f"[cadence] reaped {reaped} finished sequence(s) to 'completed'")
+    except Exception as e:
+        logger.warning(f"[cadence] reap failed: {e}")
+
     due = await seq_repo.get_due_enrollments(limit=200)
     if not due:
         return 0
@@ -131,16 +141,6 @@ async def tick() -> int:
 
             # Per-sender rate limit
             await asyncio.sleep(getattr(sender, "rate_limit_ms", 200) / 1000)
-
-        # Sequence is done when no enrollments are still 'active' (all completed,
-        # replied, stopped, or bounced). Flip the badge so the UI reflects reality
-        # instead of forever showing 'active' for an empty sequence.
-        try:
-            if await seq_repo.count_active_enrollments(seq_id) == 0:
-                await seq_repo.set_sequence_status(seq_id, "completed")
-                logger.info(f"[cadence seq={seq_id}] all enrollments done — sequence marked completed")
-        except Exception as e:
-            logger.warning(f"[cadence seq={seq_id}] could not auto-complete: {e}")
 
     for cid in touched_campaigns:
         try:
