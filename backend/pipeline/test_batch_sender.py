@@ -528,7 +528,7 @@ async def test_sentinel_placed_in_queue_after_run():
 
 async def test_dry_run_sender_always_returns_ok():
     """DryRunSender.send always succeeds without any network I/O."""
-    from backend.infra.email.dry_run import DryRunSender
+    from backend.infra.email.adapters.dry_run import DryRunSender
     sender = DryRunSender()
     result = await sender.send(OutboundEmail(
         to="alice@example.com",
@@ -540,19 +540,19 @@ async def test_dry_run_sender_always_returns_ok():
 
 
 async def test_dry_run_sender_health_check_returns_true():
-    from backend.infra.email.dry_run import DryRunSender
+    from backend.infra.email.adapters.dry_run import DryRunSender
     assert await DryRunSender().health_check() is True
 
 
 def test_dry_run_sender_satisfies_email_sender_protocol():
     """DryRunSender passes runtime isinstance check against EmailSender Protocol."""
     from backend.infra.email import EmailSender
-    from backend.infra.email.dry_run import DryRunSender
+    from backend.infra.email.adapters.dry_run import DryRunSender
     assert isinstance(DryRunSender(), EmailSender)
 
 
 def test_dry_run_sender_has_zero_rate_limit():
-    from backend.infra.email.dry_run import DryRunSender
+    from backend.infra.email.adapters.dry_run import DryRunSender
     assert DryRunSender.rate_limit_ms == 0
 
 
@@ -560,7 +560,7 @@ def test_dry_run_sender_has_zero_rate_limit():
 
 async def test_factory_dry_run_flag_returns_dry_run_sender():
     """EMAIL_DRY_RUN=true → factory returns DryRunSender regardless of provider."""
-    from backend.infra.email.dry_run import DryRunSender
+    from backend.infra.email.adapters.dry_run import DryRunSender
     from backend.infra.email.factory import build_sender
 
     # Config is imported locally inside build_sender, so patch the source module

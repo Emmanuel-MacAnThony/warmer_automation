@@ -17,13 +17,12 @@ from email.mime.text import MIMEText
 from typing import Optional
 
 from backend.config import Config
-from backend.infra.email import (
+from backend.infra.email.interfaces import (
     EmailProvider,
     EmailSender,
-    MessageRef,
-    OutboundEmail,
-    SendResult,
+    ReplyDetector,
 )
+from backend.infra.email.types import MessageRef, OutboundEmail, SendResult
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,7 @@ def _load_client_secrets() -> dict:
     return data.get("web") or data.get("installed") or {}
 
 
-class GmailSender:
+class GmailSender(EmailSender):
     """
     Sends email via Gmail API (gmail.send scope).
     rate_limit_ms = 200  → 5 sends/sec (safe under personal quota).
@@ -203,7 +202,7 @@ class GmailSender:
             return False
 
 
-class GmailReplyDetector:
+class GmailReplyDetector(ReplyDetector):
     """
     ReplyDetector adapter over a GmailSender. Shares the sender's OAuth
     state (token, refresh, DB persistence) — no duplication.

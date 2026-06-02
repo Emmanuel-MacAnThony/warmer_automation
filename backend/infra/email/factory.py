@@ -22,15 +22,15 @@ import importlib
 import logging
 from typing import Optional
 
-from backend.infra.email import EmailProvider, EmailSender
+from backend.infra.email.interfaces import EmailProvider, EmailSender
 
 logger = logging.getLogger(__name__)
 
 _PROVIDER_MODULES: dict[str, str] = {
-    "gmail":   "backend.infra.email.gmail",
-    "smtp":    "backend.infra.email.smtp",
-    "resend":  "backend.infra.email.resend",
-    "dry_run": "backend.infra.email.dry_run",
+    "gmail":   "backend.infra.email.adapters.gmail",
+    "smtp":    "backend.infra.email.adapters.smtp",
+    "resend":  "backend.infra.email.adapters.resend",
+    "dry_run": "backend.infra.email.adapters.dry_run",
 }
 
 

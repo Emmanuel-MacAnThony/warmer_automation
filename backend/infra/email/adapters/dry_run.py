@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import logging
 
-from backend.infra.email import EmailProvider, EmailSender, OutboundEmail, SendResult
+from backend.infra.email.interfaces import EmailProvider, EmailSender
+from backend.infra.email.types import OutboundEmail, SendResult
 
 logger = logging.getLogger(__name__)
 
 
-class DryRunSender:
+class DryRunSender(EmailSender):
     rate_limit_ms: int = 0
 
     async def send(self, email: OutboundEmail) -> SendResult:
