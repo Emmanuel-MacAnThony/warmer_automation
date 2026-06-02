@@ -19,7 +19,7 @@ import asyncio
 import logging
 from typing import Optional
 
-from backend.infra.email import EmailSender, OutboundEmail, SendResult
+from backend.infra.email import EmailProvider, EmailSender, OutboundEmail, SendResult
 
 logger = logging.getLogger(__name__)
 
@@ -101,15 +101,22 @@ class ResendSender:
 
 # ── Provider entry point (called by factory.py via importlib) ────────────────
 
-async def build(sender_account=None):
-    """Build a ResendSender from environment configuration."""
+async def build(sender_account=None) -> EmailProvider:
+    """
+    Build an EmailProvider for the configured Resend account.
+
+    Resend exposes replies/bounces via webhooks (not polling) — when that
+    integration lands, reply_detector and bounce_detector will be wired to
+    webhook-event readers. For now both are None.
+    """
     from backend.config import Config
     if not Config.RESEND_API_KEY:
         raise ValueError("RESEND_API_KEY is not configured in .env")
     if not Config.RESEND_FROM_EMAIL:
         raise ValueError("RESEND_FROM_EMAIL is not configured (must be a Resend-verified domain address)")
-    return ResendSender(
+    sender = ResendSender(
         api_key=Config.RESEND_API_KEY,
         from_email=Config.RESEND_FROM_EMAIL,
         from_name=Config.RESEND_FROM_NAME or None,
     )
+    return EmailProvider(sender=sender)

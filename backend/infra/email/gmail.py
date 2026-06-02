@@ -17,7 +17,13 @@ from email.mime.text import MIMEText
 from typing import Optional
 
 from backend.config import Config
-from backend.infra.email import EmailSender, OutboundEmail, SendResult
+from backend.infra.email import (
+    EmailProvider,
+    EmailSender,
+    MessageRef,
+    OutboundEmail,
+    SendResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -197,10 +203,34 @@ class GmailSender:
             return False
 
 
+class GmailReplyDetector:
+    """
+    ReplyDetector adapter over a GmailSender. Shares the sender's OAuth
+    state (token, refresh, DB persistence) — no duplication.
+
+    Reads MessageRef.thread_id to query the Gmail thread API. Returns False
+    if no thread id is present.
+    """
+
+    def __init__(self, sender: "GmailSender") -> None:
+        self._sender = sender
+
+    async def check_replied(self, ref: MessageRef) -> bool:
+        if not ref.thread_id:
+            return False
+        return await self._sender.check_thread_replied(ref.thread_id)
+
+
 # ── Provider entry point (called by factory.py via importlib) ────────────────
 
-async def build(sender_account=None):
-    """Build a GmailSender from a stored OAuth token."""
+async def build(sender_account=None) -> EmailProvider:
+    """
+    Build an EmailProvider for a stored Gmail OAuth token.
+
+    Gmail supports send + reply detection (thread reading via gmail.metadata
+    scope). Bounce detection lives in a future GmailBounceDetector that scans
+    the sender's inbox for mailer-daemon DSNs — not wired yet.
+    """
     from backend.infra.db.gmail_repo import get_gmail_token
     token = await get_gmail_token(sender_account)
     if not token:
@@ -209,4 +239,9 @@ async def build(sender_account=None):
             f"No OAuth token found for {label}. "
             "Connect an account via /auth/gmail first."
         )
-    return GmailSender(token)
+    sender = GmailSender(token)
+    return EmailProvider(
+        sender=sender,
+        reply_detector=GmailReplyDetector(sender),
+        bounce_detector=None,
+    )

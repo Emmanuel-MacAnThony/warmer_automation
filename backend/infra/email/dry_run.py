@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-from backend.infra.email import EmailSender, OutboundEmail, SendResult
+from backend.infra.email import EmailProvider, EmailSender, OutboundEmail, SendResult
 
 logger = logging.getLogger(__name__)
 
@@ -26,3 +26,10 @@ class DryRunSender:
 
     async def health_check(self) -> bool:
         return True
+
+
+# ── Provider entry point (matches the shape of gmail/smtp/resend) ────────────
+
+async def build(sender_account=None) -> EmailProvider:
+    """Build an EmailProvider that no-ops every send. No detectors needed."""
+    return EmailProvider(sender=DryRunSender())

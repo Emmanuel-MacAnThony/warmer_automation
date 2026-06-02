@@ -1,17 +1,20 @@
 """
-EmailSender factory — provider-agnostic dispatch via module registry.
+EmailProvider factory — provider-agnostic dispatch via module registry.
 
 Open/Closed: adding a new provider means creating a new module that exports
-`build(sender_account)` and adding one entry to _PROVIDER_MODULES below.
-The factory dispatch logic never changes.
+`async def build(sender_account) -> EmailProvider` and adding one entry to
+_PROVIDER_MODULES below. The factory dispatch logic never changes.
 
 Current providers:
-  gmail  → backend.infra.email.gmail   (OAuth token from DB)
-  smtp   → backend.infra.email.smtp    (SMTP_HOST/PORT/USER/PASS from env)
+  gmail   → backend.infra.email.gmail   (OAuth token from DB; reply detection wired)
+  smtp    → backend.infra.email.smtp    (SMTP_HOST/PORT/USER/PASS from env)
+  resend  → backend.infra.email.resend  (RESEND_API_KEY + verified domain)
+  dry_run → backend.infra.email.dry_run (logger-only; activated by EMAIL_DRY_RUN)
 
-To add SendGrid:
-  1. Create backend/infra/email/sendgrid.py with async def build(sender_account)
-  2. Add "sendgrid": "backend.infra.email.sendgrid" below. Done.
+To add Microsoft 365 (Graph):
+  1. Create backend/infra/email/microsoft.py with `async def build(sender_account) -> EmailProvider`
+     returning a Graph-backed sender + GraphReplyDetector + GraphBounceDetector.
+  2. Add "microsoft": "backend.infra.email.microsoft" below. Done.
 """
 from __future__ import annotations
 
@@ -19,40 +22,54 @@ import importlib
 import logging
 from typing import Optional
 
-from backend.infra.email import EmailSender
+from backend.infra.email import EmailProvider, EmailSender
 
 logger = logging.getLogger(__name__)
 
 _PROVIDER_MODULES: dict[str, str] = {
-    "gmail":  "backend.infra.email.gmail",
-    "smtp":   "backend.infra.email.smtp",
-    "resend": "backend.infra.email.resend",
+    "gmail":   "backend.infra.email.gmail",
+    "smtp":    "backend.infra.email.smtp",
+    "resend":  "backend.infra.email.resend",
+    "dry_run": "backend.infra.email.dry_run",
 }
 
 
-async def build_sender(sender_account: Optional[str] = None) -> EmailSender:
+async def build_provider(sender_account: Optional[str] = None) -> EmailProvider:
     """
-    Build an EmailSender for the configured provider.
+    Build an EmailProvider (sender + optional reply/bounce detectors) for the
+    configured provider. This is the canonical entry point for code that needs
+    post-send signals (cadence scheduler, future bounce poller).
 
     sender_account is provider-specific:
       - Gmail: email address stored in gmail_tokens
-      - SMTP:  ignored (credentials come from env)
+      - SMTP / Resend: ignored (credentials come from env)
     """
     from backend.config import Config
 
     if Config.EMAIL_DRY_RUN:
-        from backend.infra.email.dry_run import DryRunSender
-        logger.debug("[EmailFactory] DryRunSender (EMAIL_DRY_RUN=true)")
-        return DryRunSender()
+        provider_key = "dry_run"
+    else:
+        provider_key = (Config.EMAIL_PROVIDER or "gmail").lower()
 
-    provider = (Config.EMAIL_PROVIDER or "gmail").lower()
-    module_path = _PROVIDER_MODULES.get(provider)
+    module_path = _PROVIDER_MODULES.get(provider_key)
     if not module_path:
         raise ValueError(
-            f"Unknown email provider '{provider}'. "
+            f"Unknown email provider '{provider_key}'. "
             f"Supported: {', '.join(_PROVIDER_MODULES)}"
         )
 
     mod = importlib.import_module(module_path)
-    logger.debug(f"[EmailFactory] Building sender via {module_path}")
+    logger.debug(f"[EmailFactory] Building provider via {module_path}")
     return await mod.build(sender_account)
+
+
+async def build_sender(sender_account: Optional[str] = None) -> EmailSender:
+    """
+    Send-only convenience wrapper over build_provider().
+
+    For callers (batch sender, anything that purely emits) that don't need
+    reply or bounce signals. Discards the detectors so the caller doesn't
+    have to think about them.
+    """
+    provider = await build_provider(sender_account)
+    return provider.sender

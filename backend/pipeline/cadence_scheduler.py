@@ -20,8 +20,8 @@ from backend.infra.db import sequence_repo as seq_repo
 from backend.infra.db.campaign_repo import (
     get_campaign_template_by_id, send_contact, sync_campaign_sent_count,
 )
-from backend.infra.email import OutboundEmail
-from backend.infra.email.factory import build_sender
+from backend.infra.email import MessageRef, OutboundEmail
+from backend.infra.email.factory import build_provider, build_sender
 from backend.outreach.variable_resolver import resolve_contact
 
 logger = logging.getLogger(__name__)
@@ -177,17 +177,19 @@ async def poll_replies() -> int:
     for seq_id, rows in by_seq.items():
         sender_emails = rows[0].get("sender_emails") or []
         try:
-            sender = await build_sender(sender_emails[0] if sender_emails else None)
+            provider = await build_provider(sender_emails[0] if sender_emails else None)
         except Exception:
             continue
-        # Only Gmail supports thread-based reply detection.
-        check = getattr(sender, "check_thread_replied", None)
-        if not check:
+        # Providers without a reply_detector (SMTP, Resend until webhooks) don't
+        # support stop-on-reply — skip them cleanly instead of poking attributes.
+        reply_detector = provider.reply_detector
+        if reply_detector is None:
             continue
 
         for r in rows:
             try:
-                if await check(r["last_thread_id"]):
+                ref = MessageRef(thread_id=r["last_thread_id"])
+                if await reply_detector.check_replied(ref):
                     await seq_repo.finish_enrollment(r["enrollment_id"], "replied")
                     replied_total += 1
                     logger.info(f"[cadence] enrollment {r['enrollment_id']} replied — sequence stopped")

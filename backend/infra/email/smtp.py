@@ -26,7 +26,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
 
-from backend.infra.email import EmailSender, OutboundEmail, SendResult
+from backend.infra.email import EmailProvider, EmailSender, OutboundEmail, SendResult
 
 logger = logging.getLogger(__name__)
 
@@ -98,12 +98,18 @@ class SMTPSender:
 
 # ── Provider entry point (called by factory.py via importlib) ────────────────
 
-async def build(sender_account=None):
-    """Build an SMTPSender from environment configuration."""
+async def build(sender_account=None) -> EmailProvider:
+    """
+    Build an EmailProvider for the configured SMTP account.
+
+    SMTP only supports send. Reply/bounce detection would require an IMAP
+    poller (future GenericIMAPReplyDetector / GenericIMAPBounceDetector);
+    not wired yet, so both detectors are None.
+    """
     from backend.config import Config
     if not Config.SMTP_HOST:
         raise ValueError("SMTP_HOST is not configured in .env")
-    return SMTPSender(
+    sender = SMTPSender(
         host=Config.SMTP_HOST,
         port=Config.SMTP_PORT,
         username=Config.SMTP_USER,
@@ -111,3 +117,4 @@ async def build(sender_account=None):
         from_email=Config.SMTP_FROM_EMAIL,
         from_name=Config.SMTP_FROM_NAME,
     )
+    return EmailProvider(sender=sender)
