@@ -302,6 +302,39 @@ async def advance_enrollment(
         )
 
 
+async def bounce_active_enrollments_by_email(email: str) -> int:
+    """
+    Cascade a detected bounce: stop every currently-active enrollment for the
+    contacts whose email matches. Called from the DSN poll loop after the
+    suppression list has been updated, so future enrollments are already
+    handled by the enroll_tier filter — this only catches the in-flight ones.
+
+    Match is case-insensitive on the contact_snapshot.email field.
+    Returns the number of enrollments transitioned to 'bounced'.
+    """
+    email = (email or "").strip().lower()
+    if not email:
+        return 0
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            """
+            UPDATE sequence_enrollments
+            SET status = 'bounced', updated_at = now()
+            WHERE status = 'active'
+              AND campaign_contact_id IN (
+                  SELECT id FROM campaign_contacts
+                  WHERE LOWER(contact_snapshot->>'email') = $1
+              )
+            """,
+            email,
+        )
+    try:
+        return int(result.split()[-1])
+    except Exception:
+        return 0
+
+
 async def count_active_enrollments(sequence_id: int) -> int:
     """How many enrollments are still moving through this sequence."""
     pool = await get_pool()

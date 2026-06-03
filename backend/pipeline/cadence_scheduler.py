@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Optional
 
 from backend.infra.db import sequence_repo as seq_repo
@@ -29,12 +30,16 @@ from backend.outreach.variable_resolver import resolve_contact
 logger = logging.getLogger(__name__)
 
 TICK_SECONDS = 60
-REPLY_POLL_SECONDS = 120   # reply detection poll cadence (Gmail API; rate-limited)
-REPLY_BATCH_SIZE = 250     # enrollments checked per poll; rotated by last_reply_check_at
+REPLY_POLL_SECONDS = 120    # reply detection poll cadence (Gmail API; rate-limited)
+REPLY_BATCH_SIZE = 250      # enrollments checked per poll; rotated by last_reply_check_at
+BOUNCE_POLL_SECONDS = 120   # DSN scan cadence (Gmail history.list; incremental, cheap)
+BOUNCE_LOOKBACK_DAYS = 7    # bootstrap / cursor-expired window for messages.list
 _task: Optional[asyncio.Task] = None
 _reply_task: Optional[asyncio.Task] = None
-_lock = asyncio.Lock()        # ensure send-ticks never overlap
-_reply_lock = asyncio.Lock()  # ensure reply-polls never overlap
+_bounce_task: Optional[asyncio.Task] = None
+_lock = asyncio.Lock()         # ensure send-ticks never overlap
+_reply_lock = asyncio.Lock()   # ensure reply-polls never overlap
+_bounce_lock = asyncio.Lock()  # ensure bounce-polls never overlap
 
 
 async def _send_one(
@@ -318,6 +323,124 @@ async def _reply_loop() -> None:
         await asyncio.sleep(REPLY_POLL_SECONDS)
 
 
+# ── Bounce auto-detection (Phase A layer 3) ──────────────────────────────────
+
+
+async def poll_bounces() -> int:
+    """
+    DSN poll: ask every connected Gmail account's BounceDetector for any new
+    bounces since the last scan, then for each event:
+
+      1. Insert a row into email_bounces (idempotent via dsn_message_id UNIQUE).
+      2. Upsert the recipient onto email_suppressions
+         (reason='hard_bounce' if 5xx, 'soft_bounce' if 4xx;
+          soft sets retry_after = now + 24h so we don't permanently kill a
+          mailbox that was just temporarily full).
+      3. Cascade: stop any currently-active sequence enrollments for that
+         contact-email. Future enrollments are already blocked by the
+         enroll_tier suppression filter — this only catches in-flight ones.
+
+    Returns the count of bounce events processed across all accounts.
+    """
+    from datetime import timedelta
+    from backend.infra.db.gmail_repo import list_gmail_tokens
+
+    try:
+        accounts = await list_gmail_tokens()
+    except Exception as e:
+        logger.warning(f"[cadence] bounce poll: could not list Gmail accounts: {e}")
+        return 0
+
+    if not accounts:
+        return 0
+
+    since = datetime.now(timezone.utc) - timedelta(days=BOUNCE_LOOKBACK_DAYS)
+    total_processed = 0
+
+    for acct in accounts:
+        email = acct.get("email")
+        if not email:
+            continue
+        try:
+            provider = await build_provider(email)
+        except Exception as e:
+            logger.warning(f"[cadence] bounce poll: cannot build provider for {email}: {e}")
+            continue
+
+        detector = provider.bounce_detector
+        if detector is None:
+            continue  # provider doesn't support bounce detection — skip cleanly
+
+        try:
+            events = await detector.fetch_bounces(since)
+        except Exception as e:
+            msg = str(e)
+            if "insufficientPermissions" in msg or "insufficient authentication scopes" in msg:
+                logger.warning(
+                    f"[cadence] bounce detection disabled for {email}: account needs the Gmail read "
+                    f"scope. Reconnect Gmail to enable bounce auto-detection."
+                )
+            else:
+                logger.warning(f"[cadence] bounce poll failed for {email}: {e}")
+            continue
+
+        for ev in events:
+            try:
+                inserted = await sup_repo.record_bounce(
+                    email=ev.recipient,
+                    source="dsn",
+                    hard=ev.hard,
+                    reason=ev.reason,
+                    smtp_status=ev.smtp_status,
+                    source_message_id=ev.message_ref.message_id,
+                    dsn_message_id=ev.event_id,
+                )
+                if not inserted:
+                    # Already processed (dsn_message_id seen before) — skip
+                    # everything else; the cascade was done on the first sighting.
+                    continue
+
+                reason = "hard_bounce" if ev.hard else "soft_bounce"
+                retry_after = None if ev.hard else (
+                    datetime.now(timezone.utc) + timedelta(hours=24)
+                )
+                await sup_repo.upsert_suppression(
+                    ev.recipient,
+                    reason=reason,
+                    smtp_status=ev.smtp_status,
+                    reason_text=(ev.reason or "")[:300],
+                    retry_after=retry_after,
+                )
+
+                # Cascade to in-flight enrollments for this contact-email.
+                stopped = await seq_repo.bounce_active_enrollments_by_email(ev.recipient)
+                total_processed += 1
+                logger.info(
+                    f"[cadence] DSN bounce {('hard' if ev.hard else 'soft')} from {email}: "
+                    f"{ev.recipient} ({ev.smtp_status}) — suppressed; "
+                    f"{stopped} active enrollment(s) cascaded to bounced"
+                )
+            except Exception as e:
+                logger.warning(f"[cadence] bounce persist failed ({ev.recipient}): {e}")
+
+    if total_processed:
+        logger.info(f"[cadence] bounce poll processed {total_processed} new bounce(s)")
+    return total_processed
+
+
+async def _bounce_loop() -> None:
+    logger.info("Cadence bounce-poll started")
+    while True:
+        try:
+            async with _bounce_lock:
+                await poll_bounces()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error(f"Bounce poll failed (non-fatal): {e}", exc_info=True)
+        await asyncio.sleep(BOUNCE_POLL_SECONDS)
+
+
 async def _loop() -> None:
     logger.info("Cadence scheduler started")
     while True:
@@ -332,16 +455,18 @@ async def _loop() -> None:
 
 
 def start() -> None:
-    global _task, _reply_task
+    global _task, _reply_task, _bounce_task
     if not (_task and not _task.done()):
         _task = asyncio.create_task(_loop(), name="cadence-scheduler")
     if not (_reply_task and not _reply_task.done()):
         _reply_task = asyncio.create_task(_reply_loop(), name="cadence-reply-poll")
+    if not (_bounce_task and not _bounce_task.done()):
+        _bounce_task = asyncio.create_task(_bounce_loop(), name="cadence-bounce-poll")
 
 
 async def stop() -> None:
-    global _task, _reply_task
-    for t in (_task, _reply_task):
+    global _task, _reply_task, _bounce_task
+    for t in (_task, _reply_task, _bounce_task):
         if t and not t.done():
             t.cancel()
             try:
@@ -350,3 +475,4 @@ async def stop() -> None:
                 pass
     _task = None
     _reply_task = None
+    _bounce_task = None

@@ -71,3 +71,26 @@ async def delete_gmail_token(email: str) -> bool:
             "DELETE FROM gmail_tokens WHERE email=$1", email
         )
     return result != "DELETE 0"
+
+
+# ── DSN scan cursor (bounce auto-detection layer 3) ──────────────────────────
+
+
+async def get_dsn_cursor(email: str) -> Optional[str]:
+    """Last Gmail history.list id this account was scanned to. None = never scanned."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT last_dsn_history_id FROM gmail_tokens WHERE email=$1", email,
+        )
+    return row["last_dsn_history_id"] if row else None
+
+
+async def update_dsn_cursor(email: str, history_id: str) -> None:
+    """Advance the scan cursor after a successful DSN poll."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE gmail_tokens SET last_dsn_history_id=$2 WHERE email=$1",
+            email, history_id,
+        )
