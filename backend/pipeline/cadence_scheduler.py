@@ -298,6 +298,16 @@ async def poll_replies() -> int:
                         f"scope. Reconnect Gmail (disconnect + reconnect) to enable stop-on-reply."
                     )
                     break
+                if "invalid_grant" in msg:
+                    # Refresh token revoked/expired — same fix as scope issues: reconnect.
+                    acct = (rows[0].get("sender_emails") or ["?"])[0]
+                    logger.warning(
+                        f"[cadence] reply detection disabled for {acct}: Gmail refresh token is no "
+                        f"longer valid (invalid_grant). Reconnect this account in the app to issue "
+                        f"a fresh token. Common cause: OAuth app still in test mode (tokens expire "
+                        f"after 7 days) or access revoked from the user's Google account."
+                    )
+                    break
                 logger.debug(f"[cadence] reply check error on enrollment {r['enrollment_id']}: {e}")
                 checked_ids.append(r["enrollment_id"])  # rotate it back anyway
             await asyncio.sleep(0.1)  # gentle on the Gmail API
@@ -379,6 +389,13 @@ async def poll_bounces() -> int:
                 logger.warning(
                     f"[cadence] bounce detection disabled for {email}: account needs the Gmail read "
                     f"scope. Reconnect Gmail to enable bounce auto-detection."
+                )
+            elif "invalid_grant" in msg:
+                logger.warning(
+                    f"[cadence] bounce detection disabled for {email}: Gmail refresh token is no "
+                    f"longer valid (invalid_grant). Reconnect this account in the app to issue a "
+                    f"fresh token. Common cause: OAuth app still in test mode (tokens expire after "
+                    f"7 days) or access revoked from the user's Google account."
                 )
             else:
                 logger.warning(f"[cadence] bounce poll failed for {email}: {e}")
