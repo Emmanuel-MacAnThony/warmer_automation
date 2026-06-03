@@ -110,3 +110,28 @@ async def has_valid_mx(email: str) -> bool:
 def clear_cache() -> None:
     """Test helper: drop the MX cache between cases."""
     _cache.clear()
+
+
+# ── Layer 2: sync-error classifier ───────────────────────────────────────────
+#
+# When the Gmail API rejects a send synchronously (HTTP error in the send
+# response), the error string sometimes indicates the recipient is permanently
+# dead. We map those to a suppression instead of just dropping the send.
+# Anything not matching here is treated as transient (e.g. rate limit).
+_RECIPIENT_REJECTION_RE = re.compile(
+    r"(invalid (to|recipient|address)|"
+    r"user unknown|"
+    r"recipient address rejected|"
+    r"address[^\n]*rejected|"
+    r"no such (user|address|recipient|mailbox)|"
+    r"5\.1\.\d|"
+    r"\b550\b|"
+    r"mailbox[^\n]*not found|"
+    r"mailbox unavailable)",
+    re.IGNORECASE,
+)
+
+
+def is_recipient_rejection(err: Optional[str]) -> bool:
+    """True if a Gmail send-API error string indicates a permanent recipient bounce."""
+    return bool(err and _RECIPIENT_REJECTION_RE.search(err))

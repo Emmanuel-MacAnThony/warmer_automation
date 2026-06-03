@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from backend.infra.db import suppression_repo as sup_repo
 from backend.infra.db.campaign_repo import (
     bulk_mark_sent_contacts,
     get_batch_send_job,
@@ -30,6 +31,7 @@ from backend.infra.db.campaign_repo import (
 )
 from backend.infra.email import EmailSender, OutboundEmail
 from backend.infra.email.factory import build_sender
+from backend.outreach.email_validator import has_valid_mx, is_recipient_rejection
 from backend.outreach.variable_resolver import resolve_contact
 
 logger = logging.getLogger(__name__)
@@ -259,6 +261,34 @@ async def run(job_id: int) -> None:
                     )
                     continue
 
+                # ── Layer 1: MX preflight (production sends only) ─────────────
+                # Catch domain-level dead addresses before we burn a send attempt.
+                # The suppression makes them silent for every future job.
+                if not test_recipient:
+                    try:
+                        mx_ok = await has_valid_mx(to_email)
+                    except Exception as e:
+                        logger.warning(f"[batch_send job={job_id}] MX preflight raised for {to_email}: {e}")
+                        mx_ok = True  # defensive: don't false-flag on transient DNS
+                    if not mx_ok:
+                        await sup_repo.upsert_suppression(
+                            to_email, reason="mx_invalid",
+                            reason_text="Domain has no MX or A records",
+                        )
+                        await sup_repo.record_bounce(
+                            email=to_email, source="batch", hard=True,
+                            reason="mx_invalid: domain has no MX/A records",
+                            batch_job_id=job_id,
+                        )
+                        logger.info(
+                            f"[batch_send job={job_id}] MX preflight failed for {to_email} — suppressed"
+                        )
+                        total_failed += 1
+                        chunk_results.append(
+                            ContactSendResult(contact["id"], "failed", resolved["rendered_body"])
+                        )
+                        continue
+
                 outbound = OutboundEmail(
                     to=to_email,
                     subject=subject_line,
@@ -316,6 +346,22 @@ async def run(job_id: int) -> None:
                         ContactSendResult(contact["id"], "sent", resolved["rendered_body"])
                     )
                 else:
+                    # Layer 2: sync-error map. Gmail's response string matches a
+                    # permanent recipient-rejection pattern → suppress + audit so
+                    # this address is dead across every future sequence and batch.
+                    if not test_recipient and is_recipient_rejection(result.error):
+                        await sup_repo.upsert_suppression(
+                            to_email, reason="sync_rejected",
+                            reason_text=(result.error or "")[:300],
+                        )
+                        await sup_repo.record_bounce(
+                            email=to_email, source="batch", hard=True,
+                            reason=(result.error or "")[:300],
+                            batch_job_id=job_id,
+                        )
+                        logger.info(
+                            f"[batch_send job={job_id}] sync-rejection on {to_email} — suppressed: {result.error}"
+                        )
                     total_failed += 1
                     chunk_results.append(
                         ContactSendResult(contact["id"], "failed", resolved["rendered_body"])

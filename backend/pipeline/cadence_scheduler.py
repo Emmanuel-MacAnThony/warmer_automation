@@ -20,8 +20,10 @@ from backend.infra.db import sequence_repo as seq_repo
 from backend.infra.db.campaign_repo import (
     get_campaign_template_by_id, send_contact, sync_campaign_sent_count,
 )
+from backend.infra.db import suppression_repo as sup_repo
 from backend.infra.email import MessageRef, OutboundEmail
 from backend.infra.email.factory import build_provider, build_sender
+from backend.outreach.email_validator import has_valid_mx, is_recipient_rejection
 from backend.outreach.variable_resolver import resolve_contact
 
 logger = logging.getLogger(__name__)
@@ -35,8 +37,31 @@ _lock = asyncio.Lock()        # ensure send-ticks never overlap
 _reply_lock = asyncio.Lock()  # ensure reply-polls never overlap
 
 
-async def _send_one(sender, due: dict, template: dict, test_recipient: Optional[str]) -> tuple[bool, Optional[str], Optional[str]]:
-    """Resolve + send a single step. Returns (ok, message_id, thread_id)."""
+async def _send_one(
+    sender, due: dict, template: dict, test_recipient: Optional[str]
+) -> dict:
+    """
+    Resolve + send a single step, with the first two layers of bounce detection
+    baked in (MX preflight + Gmail-API sync-error mapping).
+
+    Returns a structured outcome:
+        {
+          "ok":          bool,           # send succeeded
+          "message_id":  Optional[str],  # provider id (if any)
+          "thread_id":   Optional[str],  # Gmail thread id (if any)
+          "bounced":     bool,           # contact is now suppressed; enrollment should go 'bounced'
+          "reason":      Optional[str],  # short tag: 'mx_invalid' | 'sync_rejected' | 'no_email'
+        }
+
+    Layers in order:
+      1. MX preflight — domain has no MX → suppress(mx_invalid), bounce row.
+      2. Send.
+      3. Sync-error map — Gmail's response matches a recipient-rejection
+         pattern → suppress(sync_rejected), bounce row.
+
+    Skipped when test_recipient is set, so dry-running to your own inbox never
+    accidentally suppresses anything.
+    """
     resolved = resolve_contact(template["subject"], template["body"], due)
     snap = due.get("contact_snapshot") or {}
     name = snap.get("name", "") or snap.get("email", "")
@@ -49,12 +74,62 @@ async def _send_one(sender, due: dict, template: dict, test_recipient: Optional[
         subject = resolved["rendered_subject"]
 
     if not to_email:
-        return False, None, None  # caller stops the enrollment (nothing to send to)
+        return {"ok": False, "message_id": None, "thread_id": None,
+                "bounced": False, "reason": "no_email"}
 
+    # ── Layer 1: MX preflight (production sends only) ───────────────────────
+    if not test_recipient:
+        try:
+            if not await has_valid_mx(to_email):
+                await sup_repo.upsert_suppression(
+                    to_email, reason="mx_invalid",
+                    reason_text="Domain has no MX or A records",
+                )
+                await sup_repo.record_bounce(
+                    email=to_email, source="sequence", hard=True,
+                    reason="mx_invalid: domain has no MX/A records",
+                    sequence_enrollment_id=due.get("enrollment_id"),
+                )
+                logger.info(
+                    f"[cadence] MX preflight failed for {to_email} — suppressed "
+                    f"(enrollment={due.get('enrollment_id')})"
+                )
+                return {"ok": False, "message_id": None, "thread_id": None,
+                        "bounced": True, "reason": "mx_invalid"}
+        except Exception as e:
+            # Validator is defensive (returns True on transient DNS failure),
+            # so this branch should be rare — log and proceed with the send.
+            logger.warning(f"[cadence] MX preflight raised for {to_email}: {e}")
+
+    # ── Send ───────────────────────────────────────────────────────────────
     result = await sender.send(OutboundEmail(
         to=to_email, subject=subject, body_html=resolved["rendered_body"],
     ))
-    return bool(result.ok), getattr(result, "message_id", None), getattr(result, "thread_id", None)
+    ok = bool(result.ok)
+    msg_id = getattr(result, "message_id", None)
+    thr_id = getattr(result, "thread_id", None)
+    err = getattr(result, "error", None)
+
+    # ── Layer 2: sync-error map (production sends only) ─────────────────────
+    if not ok and not test_recipient and is_recipient_rejection(err):
+        await sup_repo.upsert_suppression(
+            to_email, reason="sync_rejected",
+            reason_text=(err or "")[:300],
+        )
+        await sup_repo.record_bounce(
+            email=to_email, source="sequence", hard=True,
+            reason=(err or "")[:300],
+            sequence_enrollment_id=due.get("enrollment_id"),
+        )
+        logger.info(
+            f"[cadence] sync-rejection on {to_email} — suppressed "
+            f"(enrollment={due.get('enrollment_id')}): {err}"
+        )
+        return {"ok": False, "message_id": msg_id, "thread_id": thr_id,
+                "bounced": True, "reason": "sync_rejected"}
+
+    return {"ok": ok, "message_id": msg_id, "thread_id": thr_id,
+            "bounced": False, "reason": None}
 
 
 async def tick() -> int:
@@ -111,13 +186,25 @@ async def tick() -> int:
                 continue
 
             try:
-                ok, message_id, thread_id = await _send_one(sender, d, template, test_recipient)
+                outcome = await _send_one(sender, d, template, test_recipient)
             except Exception as e:
                 logger.warning(f"[cadence seq={seq_id}] send error on enrollment {d['enrollment_id']}: {e}")
                 continue  # leave active → retried next tick
 
+            if outcome["bounced"]:
+                # Address is dead (MX-invalid or Gmail rejected synchronously).
+                # The suppression + audit row was already written inside _send_one;
+                # just mark the enrollment terminal so it doesn't retry.
+                await seq_repo.finish_enrollment(d["enrollment_id"], "bounced")
+                continue
+
+            ok = outcome["ok"]
+            message_id = outcome["message_id"]
+            thread_id = outcome["thread_id"]
+
             if not ok:
-                # No deliverable address → can't ever send; stop it.
+                # No deliverable address or transient failure that didn't match
+                # any rejection pattern → stop the enrollment (won't retry).
                 await seq_repo.finish_enrollment(d["enrollment_id"], "stopped")
                 continue
 
