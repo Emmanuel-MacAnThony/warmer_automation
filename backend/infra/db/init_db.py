@@ -448,16 +448,32 @@ ALTER TABLE gmail_tokens ADD COLUMN IF NOT EXISTS last_dsn_history_id TEXT;
 """
 
 
+async def apply_migrations() -> None:
+    """
+    Apply the idempotent DDL block against the configured database.
+
+    Safe to call from the FastAPI startup lifespan AND from the CLI: every
+    statement uses IF NOT EXISTS / DROP IF EXISTS so reruns are no-ops.
+    Does NOT manage the asyncpg pool lifecycle — callers that own the pool
+    (the lifespan) keep it open after; the CLI closes it explicitly.
+
+    Raises asyncpg errors so callers can choose how to handle them.
+    """
+    if not Config.DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not configured")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(DDL)
+
+
 async def init():
+    """CLI entry: apply_migrations() + close the pool + emit a summary."""
     if not Config.DATABASE_URL:
         logger.error("DATABASE_URL is not set in .env")
         sys.exit(1)
 
     logger.info("Connecting to database...")
-    pool = await get_pool()
-
-    async with pool.acquire() as conn:
-        await conn.execute(DDL)
+    await apply_migrations()
 
     logger.info("Tables created (or already exist):")
     logger.info("  - field_mappings")
@@ -472,6 +488,8 @@ async def init():
     logger.info("  - batch_send_jobs")
     logger.info("  - campaign_files")
     logger.info("  - gmail_tokens")
+    logger.info("  - email_suppressions")
+    logger.info("  - email_bounces")
 
     await close_pool()
     logger.info("Done.")

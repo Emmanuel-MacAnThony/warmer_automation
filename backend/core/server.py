@@ -42,6 +42,20 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # --- startup ---
+
+    # Run idempotent schema migrations before anything else so subsequent steps
+    # (recovery, scheduler, polls) can rely on every column / table existing.
+    # apply_migrations() is no-op safe — every DDL statement is IF NOT EXISTS.
+    try:
+        from backend.infra.db.init_db import apply_migrations
+        await apply_migrations()
+        logger.info("Startup: schema migrations applied")
+    except Exception as e:
+        # Don't refuse to boot on a migration error — log loudly and proceed.
+        # The endpoints depending on missing columns will fail visibly with a
+        # SQL error, which is more debuggable than a refused startup.
+        logger.error(f"Startup: schema migrations failed (continuing): {e}")
+
     try:
         from backend.infra.db.job_repo import reset_stale_batches, reset_stale_pipeline_runs, reset_stale_dedup_runs
 
