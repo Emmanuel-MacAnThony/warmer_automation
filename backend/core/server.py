@@ -10,6 +10,7 @@ Responsibilities:
 All route handlers live in backend/api/*.
 """
 
+import asyncio
 import logging
 import sys
 from contextlib import asynccontextmanager
@@ -39,22 +40,36 @@ logger = logging.getLogger(__name__)
 # Lifespan
 # ---------------------------------------------------------------------------
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    # --- startup ---
+async def _run_migrations_in_background() -> None:
+    """
+    Idempotent schema migration runner spawned as a background task in lifespan.
 
-    # Run idempotent schema migrations before anything else so subsequent steps
-    # (recovery, scheduler, polls) can rely on every column / table existing.
-    # apply_migrations() is no-op safe — every DDL statement is IF NOT EXISTS.
+    Doing this in the background instead of awaiting lets uvicorn bind the
+    port and start accepting requests immediately — important on Render,
+    where the port-scan timeout (~90s) fires from process start, not from
+    lifespan completion. Cold-start asyncpg + DDL roundtrips can otherwise
+    push total startup past that window even when the migrations themselves
+    are no-ops on an existing schema.
+
+    On Render the pre-deploy hook already applies the migrations before the
+    web service boots, so this background run is normally an all-no-op
+    safety net. Locally it's the only thing that applies new schema changes
+    without remembering to run `python -m backend.infra.db.init_db`.
+    """
     try:
         from backend.infra.db.init_db import apply_migrations
         await apply_migrations()
         logger.info("Startup: schema migrations applied")
     except Exception as e:
-        # Don't refuse to boot on a migration error — log loudly and proceed.
-        # The endpoints depending on missing columns will fail visibly with a
-        # SQL error, which is more debuggable than a refused startup.
         logger.error(f"Startup: schema migrations failed (continuing): {e}")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # --- startup ---
+
+    # Kick off migrations without blocking — see _run_migrations_in_background.
+    asyncio.create_task(_run_migrations_in_background())
 
     try:
         from backend.infra.db.job_repo import reset_stale_batches, reset_stale_pipeline_runs, reset_stale_dedup_runs
