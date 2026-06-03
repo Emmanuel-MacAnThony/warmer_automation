@@ -183,6 +183,43 @@ export interface SequenceReply {
   replied_at: string | null
 }
 
+export interface SequenceBounce {
+  name: string
+  email: string
+  title: string
+  company: string
+  bounced_at: string | null
+  reason: string | null
+  smtp_status: string | null
+  hard: boolean | null
+  detected_at: string | null
+}
+
+export interface Suppression {
+  id: number
+  email: string
+  reason: 'hard_bounce' | 'soft_bounce' | 'mx_invalid' | 'sync_rejected' | 'unsubscribed' | 'manual'
+  first_seen_at: string
+  last_seen_at: string
+  retry_after: string | null
+  last_smtp_status: string | null
+  last_reason_text: string | null
+}
+
+export interface BounceAuditEvent {
+  id: number
+  email: string
+  source: 'sequence' | 'batch' | 'mx_preflight' | 'sync_error' | 'dsn'
+  sequence_enrollment_id: number | null
+  batch_job_id: number | null
+  hard: boolean
+  reason: string | null
+  smtp_status: string | null
+  source_message_id: string | null
+  dsn_message_id: string | null
+  detected_at: string
+}
+
 export interface SequenceStats {
   total: number
   active: number
@@ -405,6 +442,31 @@ export const api = {
 
   getSequenceReplies: (sequenceId: number) =>
     request<{ replies: SequenceReply[] }>(`/sequences/${sequenceId}/replies`).then(r => r.replies),
+
+  getSequenceBounces: (sequenceId: number) =>
+    request<{ bounces: SequenceBounce[] }>(`/sequences/${sequenceId}/bounces`).then(r => r.bounces),
+
+  listSuppressions: (opts: { limit?: number; offset?: number; search?: string } = {}) => {
+    const qs = new URLSearchParams()
+    if (opts.limit !== undefined)  qs.set('limit',  String(opts.limit))
+    if (opts.offset !== undefined) qs.set('offset', String(opts.offset))
+    if (opts.search)               qs.set('search', opts.search)
+    const q = qs.toString()
+    return request<{ suppressions: Suppression[]; active_count: number }>(
+      `/suppressions${q ? `?${q}` : ''}`,
+    )
+  },
+
+  getSuppressionBounces: (email: string, limit = 50) =>
+    request<{ bounces: BounceAuditEvent[] }>(
+      `/suppressions/${encodeURIComponent(email)}/bounces?limit=${limit}`,
+    ).then(r => r.bounces),
+
+  unsuppress: (email: string) =>
+    request<{ removed: boolean }>(`/suppressions/unsuppress`, {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
 
   getSequence: (sequenceId: number) =>
     request<Sequence>(`/sequences/${sequenceId}`),

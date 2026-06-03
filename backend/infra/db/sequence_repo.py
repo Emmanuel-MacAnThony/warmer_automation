@@ -392,6 +392,57 @@ async def finish_enrollment(enrollment_id: int, status: str = "completed",
         )
 
 
+async def get_bounced_contacts(sequence_id: int, limit: int = 200) -> list[dict[str, Any]]:
+    """
+    Contacts whose enrollment in this sequence ended in 'bounced'. Joined with
+    the most recent email_bounces row for that recipient so the UI can show
+    a reason (e.g. "Mailbox unavailable") and SMTP status.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT cc.contact_snapshot,
+                   se.updated_at,
+                   eb.reason       AS bounce_reason,
+                   eb.smtp_status  AS bounce_status,
+                   eb.detected_at  AS bounce_detected_at,
+                   eb.hard         AS bounce_hard
+            FROM sequence_enrollments se
+            JOIN campaign_contacts cc ON cc.id = se.campaign_contact_id
+            LEFT JOIN LATERAL (
+                SELECT reason, smtp_status, detected_at, hard
+                FROM email_bounces
+                WHERE email = LOWER(cc.contact_snapshot->>'email')
+                ORDER BY detected_at DESC
+                LIMIT 1
+            ) eb ON TRUE
+            WHERE se.sequence_id = $1 AND se.status = 'bounced'
+            ORDER BY se.updated_at DESC
+            LIMIT $2
+            """,
+            sequence_id, limit,
+        )
+    out = []
+    for r in rows:
+        snap = r["contact_snapshot"]
+        if isinstance(snap, str):
+            snap = json.loads(snap)
+        snap = snap or {}
+        out.append({
+            "name": snap.get("name") or "Unknown",
+            "email": snap.get("email") or "",
+            "title": snap.get("title") or "",
+            "company": snap.get("company") or "",
+            "bounced_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+            "reason": r["bounce_reason"],
+            "smtp_status": r["bounce_status"],
+            "hard": r["bounce_hard"],
+            "detected_at": r["bounce_detected_at"].isoformat() if r["bounce_detected_at"] else None,
+        })
+    return out
+
+
 async def get_replied_contacts(sequence_id: int, limit: int = 200) -> list[dict[str, Any]]:
     """Contacts who replied to this sequence — the hot leads. Newest first."""
     pool = await get_pool()

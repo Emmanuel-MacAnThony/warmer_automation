@@ -12,8 +12,8 @@ export type OutreachContextValue = {
     // Navigation
     view: View;
     setView: (v: View) => void;
-    listTab: "campaigns" | "jobs" | "sequences";
-    setListTab: (t: "campaigns" | "jobs" | "sequences") => void;
+    listTab: "campaigns" | "jobs" | "sequences" | "suppressions";
+    setListTab: (t: "campaigns" | "jobs" | "sequences" | "suppressions") => void;
 
     // Campaigns
     campaigns: Campaign[];

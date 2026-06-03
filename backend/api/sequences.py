@@ -118,6 +118,17 @@ async def get_sequence_replies(sequence_id: int):
         return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
+@router.get("/sequences/{sequence_id}/bounces")
+async def get_sequence_bounces(sequence_id: int):
+    """Contacts whose enrollment in this sequence ended in 'bounced'."""
+    try:
+        from backend.infra.db import sequence_repo as seq_repo
+        return {"bounces": await seq_repo.get_bounced_contacts(sequence_id)}
+    except Exception as e:
+        logger.error(f"Failed to get bounces for sequence {sequence_id}: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})
+
+
 @router.delete("/sequences/{sequence_id}")
 async def delete_sequence(sequence_id: int):
     """Delete a sequence (and its steps + enrollments)."""

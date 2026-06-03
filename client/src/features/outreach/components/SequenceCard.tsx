@@ -1,7 +1,7 @@
-import { api, type Sequence, type SequenceReply } from "@/shared/api/client";
+import { api, type Sequence, type SequenceBounce, type SequenceReply } from "@/shared/api/client";
 import { Card } from "@/shared/components/ui/card";
 import { cn } from "@/shared/lib/utils";
-import { ChevronRight, Clock, Layers, Loader2, Pause, Play, Trash2 } from "lucide-react";
+import { AlertTriangle, ChevronRight, Clock, Layers, Loader2, Pause, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { TIER_ROWS } from "../constants";
 import { sentenceCase } from "../utils";
@@ -37,18 +37,32 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
     const stepCount = seq.steps?.length ?? Math.max(1, Object.keys(s.by_step).length);
     const canToggle = seq.status === "active" || seq.status === "paused";
 
-    const [showReplies, setShowReplies] = useState(false);
+    // Only one drawer expanded at a time. Mutually exclusive: opening one closes the other.
+    const [expanded, setExpanded] = useState<"replies" | "bounces" | null>(null);
     const [replies, setReplies] = useState<SequenceReply[] | null>(null);
     const [loadingReplies, setLoadingReplies] = useState(false);
+    const [bounces, setBounces] = useState<SequenceBounce[] | null>(null);
+    const [loadingBounces, setLoadingBounces] = useState(false);
 
     const toggleReplies = async () => {
-        const next = !showReplies;
-        setShowReplies(next);
-        if (next && replies === null) {
+        const next = expanded === "replies" ? null : "replies";
+        setExpanded(next);
+        if (next === "replies" && replies === null) {
             setLoadingReplies(true);
             try { setReplies(await api.getSequenceReplies(seq.id)); }
             catch { setReplies([]); }
             finally { setLoadingReplies(false); }
+        }
+    };
+
+    const toggleBounces = async () => {
+        const next = expanded === "bounces" ? null : "bounces";
+        setExpanded(next);
+        if (next === "bounces" && bounces === null) {
+            setLoadingBounces(true);
+            try { setBounces(await api.getSequenceBounces(seq.id)); }
+            catch { setBounces([]); }
+            finally { setLoadingBounces(false); }
         }
     };
 
@@ -59,9 +73,18 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
           hint: "Replied — sequence stopped for them." },
         { label: "Done",    value: s.completed, color: "text-muted-foreground/70",
           hint: "Reached the final step." },
+        { label: "Bounced", value: s.bounced,   color: s.bounced > 0 ? "text-red-500/75" : "text-muted-foreground/50",
+          hint: "Address rejected (MX fail, Gmail sync error, or DSN bounce) — contact added to the suppression list." },
         { label: "Stopped", value: s.stopped,   color: s.stopped > 0 ? "text-amber-500/70" : "text-muted-foreground/50",
-          hint: "Stopped (no deliverable address, bounce, or template missing)." },
+          hint: "Stopped (no deliverable address, template missing, or other terminal error)." },
     ];
+
+    // High-bounce-rate warning. Once 5+ contacts have been actually sent to, if
+    // ≥5% of them bounce, warn the fundraiser so they can pause + clean the list
+    // before sender reputation suffers further.
+    const reached = s.completed + s.replied + s.stopped + s.bounced + s.active;
+    const bounceRate = reached >= 5 && s.bounced > 0 ? (s.bounced / reached) : 0;
+    const showBounceWarning = bounceRate >= 0.05;
 
     // Per-step schedule. Anchor on the first step that has a REAL next_send_at
     // (contacts actually queued there). Steps AFTER the anchor are projected
@@ -142,27 +165,47 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
             </div>
             <div className="flex divide-x divide-border/40">
                 {metrics.map((m) => {
-                    const clickable = m.label === "Replied" && s.replied > 0;
+                    const isReplied = m.label === "Replied" && s.replied > 0;
+                    const isBounced = m.label === "Bounced" && s.bounced > 0;
+                    const clickable = isReplied || isBounced;
+                    const onClick = isReplied ? toggleReplies : isBounced ? toggleBounces : undefined;
+                    const isOpen = (isReplied && expanded === "replies") || (isBounced && expanded === "bounces");
                     return (
                         <button
                             key={m.label}
-                            onClick={clickable ? toggleReplies : undefined}
+                            onClick={onClick}
                             disabled={!clickable}
                             className={cn(
                                 "flex-1 flex flex-col items-center justify-center px-3 py-3 transition-colors",
-                                clickable ? "hover:bg-emerald-500/5 cursor-pointer" : "cursor-default",
+                                clickable && isReplied ? "hover:bg-emerald-500/5 cursor-pointer" :
+                                clickable && isBounced ? "hover:bg-red-500/5 cursor-pointer" :
+                                "cursor-default",
                             )}
-                            title={clickable ? "View who replied" : m.hint}
+                            title={
+                                isReplied ? "View who replied" :
+                                isBounced ? "View who bounced" :
+                                m.hint
+                            }
                         >
                             <p className={cn("text-sm font-semibold tabular-nums leading-none", m.color)}>{m.value.toLocaleString()}</p>
                             <p className="font-mono text-[9px] text-muted-foreground/40 tracking-widest uppercase mt-1 flex items-center gap-0.5">
                                 {m.label}
-                                {clickable && <ChevronRight size={9} className={cn("transition-transform", showReplies && "rotate-90")} />}
+                                {clickable && <ChevronRight size={9} className={cn("transition-transform", isOpen && "rotate-90")} />}
                             </p>
                         </button>
                     );
                 })}
             </div>
+
+            {/* High bounce rate warning — sender reputation guard */}
+            {showBounceWarning && seq.status !== "draft" && (
+                <div className="flex items-start gap-2 px-4 py-2 border-t border-amber-500/20 bg-amber-500/5 text-[11px] text-amber-300/90">
+                    <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-400" />
+                    <span>
+                        <span className="font-medium">High bounce rate ({Math.round(bounceRate * 100)}%)</span> — your contact list quality may be hurting domain reputation. Consider pausing and cleaning the list before sending more.
+                    </span>
+                </div>
+            )}
 
             {/* Next-send summary — when the next batch goes out + reply rate */}
             {(seq.status === "active" || seq.status === "paused") && s.total > 0 && (
@@ -191,7 +234,7 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
             )}
 
             {/* Hot leads — who replied */}
-            {showReplies && (
+            {expanded === "replies" && (
                 <div className="border-t border-emerald-500/15 bg-emerald-500/5 px-4 py-2.5">
                     {loadingReplies ? (
                         <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 size={11} className="animate-spin" /> Loading replies…</div>
@@ -207,6 +250,34 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
                                         <span className="text-muted-foreground/40 truncate hidden sm:inline">{[r.title, r.company].filter(Boolean).join(" · ")}</span>
                                     )}
                                     {r.email && <span className="ml-auto font-mono text-muted-foreground/50 truncate shrink-0">{r.email}</span>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+            {/* Bounces — who couldn't be reached */}
+            {expanded === "bounces" && (
+                <div className="border-t border-red-500/15 bg-red-500/5 px-4 py-2.5">
+                    {loadingBounces ? (
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 size={11} className="animate-spin" /> Loading bounces…</div>
+                    ) : !bounces || bounces.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground/50">No bounces yet.</p>
+                    ) : (
+                        <div className="space-y-1.5">
+                            <p className="text-[9px] font-mono uppercase tracking-widest text-red-400/70">Bounced — suppressed from future campaigns</p>
+                            {bounces.map((b, i) => (
+                                <div key={i} className="flex items-center gap-2 text-[11px]">
+                                    <span className="text-foreground/80 truncate">{b.name}</span>
+                                    {b.smtp_status && (
+                                        <span className="font-mono text-[9px] text-red-400/70 shrink-0" title={b.reason ?? undefined}>
+                                            {b.smtp_status}{b.hard === false ? " (soft)" : ""}
+                                        </span>
+                                    )}
+                                    {(b.title || b.company) && (
+                                        <span className="text-muted-foreground/40 truncate hidden sm:inline">{[b.title, b.company].filter(Boolean).join(" · ")}</span>
+                                    )}
+                                    {b.email && <span className="ml-auto font-mono text-muted-foreground/50 truncate shrink-0">{b.email}</span>}
                                 </div>
                             ))}
                         </div>

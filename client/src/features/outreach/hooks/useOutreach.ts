@@ -34,7 +34,7 @@ export function useOutreach(): OutreachContextValue & { baseId: string | null; t
     // setView is a thin navigate wrapper — all existing call sites work unchanged
     const setView = (v: View) => navigate(v === "list" ? "/outreach" : `/outreach/${v}`);
 
-    const [listTab, setListTab] = useState<"campaigns" | "jobs" | "sequences">("campaigns");
+    const [listTab, setListTab] = useState<"campaigns" | "jobs" | "sequences" | "suppressions">("campaigns");
 
     // ── Campaigns ─────────────────────────────────────────────────────────────
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);

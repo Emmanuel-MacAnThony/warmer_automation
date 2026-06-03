@@ -8,6 +8,7 @@ import type { Tier } from "../types";
 import { useOutreachContext } from "../context/OutreachContext";
 import { CampaignCard } from "./CampaignCard";
 import { SequenceCard } from "./SequenceCard";
+import { SuppressionsView } from "./SuppressionsView";
 
 export function CampaignListView() {
     const {
@@ -86,6 +87,17 @@ export function CampaignListView() {
                         >
                             Sequences
                         </button>
+                        <button
+                            onClick={() => setListTab("suppressions")}
+                            className={cn(
+                                "px-3 py-1 text-xs font-mono font-medium rounded-md transition-all duration-150",
+                                listTab === "suppressions"
+                                    ? "bg-background text-foreground shadow-sm border border-border/60"
+                                    : "text-muted-foreground hover:text-foreground",
+                            )}
+                        >
+                            Suppressions
+                        </button>
                     </div>
                 </div>
                 {listTab === "campaigns" && (
@@ -138,6 +150,8 @@ export function CampaignListView() {
                         </div>
                     </>
                 )
+            ) : listTab === "suppressions" ? (
+                <SuppressionsView />
             ) : listTab === "jobs" ? (
                 <>
                     <ConfirmDialog
