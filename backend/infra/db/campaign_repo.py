@@ -797,12 +797,24 @@ async def get_pending_contacts_for_job(
     Return contacts targeted by a batch send job, ordered by queue_position.
     scope='unsent'   → pending + later contacts only
     scope='everyone' → all contacts in the tier
+
+    Suppression: contacts whose email is on the active email_suppressions list
+    are silently filtered out — same guard as enroll_tier in sequence_repo,
+    applied per-batch instead of per-sequence.
     """
     pool = await get_pool()
     async with pool.acquire() as conn:
         if scope == "everyone":
             rows = await conn.fetch(
-                "SELECT * FROM campaign_contacts WHERE campaign_id=$1 AND tier=$2 ORDER BY queue_position",
+                """
+                SELECT * FROM campaign_contacts
+                WHERE campaign_id=$1 AND tier=$2
+                  AND LOWER(contact_snapshot->>'email') NOT IN (
+                      SELECT email FROM email_suppressions
+                      WHERE retry_after IS NULL OR retry_after < now()
+                  )
+                ORDER BY queue_position
+                """,
                 campaign_id, tier,
             )
         else:
@@ -810,6 +822,10 @@ async def get_pending_contacts_for_job(
                 """
                 SELECT * FROM campaign_contacts
                 WHERE campaign_id=$1 AND tier=$2 AND status IN ('pending','later')
+                  AND LOWER(contact_snapshot->>'email') NOT IN (
+                      SELECT email FROM email_suppressions
+                      WHERE retry_after IS NULL OR retry_after < now()
+                  )
                 ORDER BY queue_position
                 """,
                 campaign_id, tier,

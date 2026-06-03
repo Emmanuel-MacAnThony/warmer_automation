@@ -33,5 +33,8 @@ google-auth==2.53.0
 google-auth-oauthlib==1.4.0
 google-api-python-client==2.196.0
 
+# MX preflight (bounce auto-detection layer 1) — domain DNS lookup
+dnspython==2.8.0
+
 # Testing (dev only — not needed at runtime)
 pytest==9.0.3

@@ -396,6 +396,55 @@ ALTER TABLE batch_send_jobs     ADD COLUMN IF NOT EXISTS retry_after  TIMESTAMPT
 -- last_reply_check_at: rotates the reply poller fairly across all enrollments
 -- (order by this, oldest first) so large active sets are all covered, not a stuck window.
 ALTER TABLE sequence_enrollments ADD COLUMN IF NOT EXISTS last_reply_check_at TIMESTAMPTZ;
+
+-- ── Bounce auto-detection (Phase A) ──────────────────────────────────────────
+--
+-- Canonical dead-list keyed by email address. Read by enroll_tier (sequences)
+-- and the batch contact-selection query on every send to suppress contacts
+-- we already know are dead. retry_after lets soft bounces re-enter the pool
+-- after a backoff; hard bounces leave it NULL forever.
+CREATE TABLE IF NOT EXISTS email_suppressions (
+    id                SERIAL PRIMARY KEY,
+    email             TEXT NOT NULL UNIQUE,
+    reason            TEXT NOT NULL
+                      CHECK (reason IN ('hard_bounce', 'soft_bounce', 'mx_invalid',
+                                        'sync_rejected', 'unsubscribed', 'manual')),
+    first_seen_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    retry_after       TIMESTAMPTZ,
+    last_smtp_status  TEXT,
+    last_reason_text  TEXT
+);
+-- Active (un-retryable) suppression index — what the send-side filter actually queries.
+CREATE INDEX IF NOT EXISTS email_suppressions_active_idx
+    ON email_suppressions (email)
+    WHERE retry_after IS NULL;
+
+-- Audit log of every detected bounce event. Multiple rows per email are normal
+-- (a soft bounce, then a hard bounce, then a re-add). dsn_message_id UNIQUE
+-- gives the DSN poller idempotency on restart.
+CREATE TABLE IF NOT EXISTS email_bounces (
+    id                       SERIAL PRIMARY KEY,
+    email                    TEXT NOT NULL,
+    source                   TEXT NOT NULL
+                             CHECK (source IN ('sequence', 'batch', 'mx_preflight',
+                                               'sync_error', 'dsn')),
+    sequence_enrollment_id   INT REFERENCES sequence_enrollments(id) ON DELETE SET NULL,
+    batch_job_id             INT REFERENCES batch_send_jobs(id) ON DELETE SET NULL,
+    hard                     BOOLEAN NOT NULL,
+    reason                   TEXT,
+    smtp_status              TEXT,
+    source_message_id        TEXT,
+    dsn_message_id           TEXT UNIQUE,
+    detected_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS email_bounces_email_idx       ON email_bounces (email);
+CREATE INDEX IF NOT EXISTS email_bounces_sequence_idx    ON email_bounces (sequence_enrollment_id) WHERE sequence_enrollment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS email_bounces_batch_idx       ON email_bounces (batch_job_id)           WHERE batch_job_id           IS NOT NULL;
+
+-- DSN scan cursor per Gmail account — Gmail history.list resumes from this id
+-- so the poller processes only NEW inbox changes, not the whole inbox each tick.
+ALTER TABLE gmail_tokens ADD COLUMN IF NOT EXISTS last_dsn_history_id TEXT;
 """
 
 

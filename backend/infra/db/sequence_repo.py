@@ -145,6 +145,12 @@ async def enroll_tier(sequence_id: int, campaign_id: int, tier: str, scope: str 
     Enroll a tier's contacts into the sequence. Step 1 is due immediately.
     scope='everyone' → all contacts in the tier (re-sequence even already-contacted).
     scope='unsent'   → only pending/later (not yet contacted).
+
+    Suppression: contacts whose email is on the active email_suppressions list
+    are silently skipped — no enrollment row created. This is what makes a
+    bounced address dead across every future sequence, not just the one that
+    caused the bounce.
+
     Idempotent — already-enrolled contacts skip. Returns count of new enrollments.
     """
     status_filter = "" if scope == "everyone" else "AND cc.status IN ('pending','later')"
@@ -156,6 +162,10 @@ async def enroll_tier(sequence_id: int, campaign_id: int, tier: str, scope: str 
             SELECT $1, cc.id, 1, now()
             FROM campaign_contacts cc
             WHERE cc.campaign_id=$2 AND cc.tier=$3 {status_filter}
+              AND LOWER(cc.contact_snapshot->>'email') NOT IN (
+                  SELECT email FROM email_suppressions
+                  WHERE retry_after IS NULL OR retry_after < now()
+              )
             ON CONFLICT (sequence_id, campaign_contact_id) DO NOTHING
             """,
             sequence_id, campaign_id, tier,
