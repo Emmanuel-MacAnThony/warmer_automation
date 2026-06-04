@@ -143,9 +143,12 @@ def rewrite_links_in_body(
 
 # Tasteful CTA block. Inline styles only so it renders consistently across
 # Gmail / Outlook / Apple Mail without depending on a stylesheet.
+# target=_blank so previewing in-app opens the destination in a new tab
+# (most email clients open links externally regardless of target, so this
+# only affects the preview UX — never a real recipient).
 _CTA_TEMPLATE = (
     '<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;">'
-    '<a href="{url}" '
+    '<a href="{url}" target="_blank" rel="noopener noreferrer" '
     'style="display:inline-block;padding:10px 18px;'
     'background:#0f172a;color:#ffffff;text-decoration:none;'
     'border-radius:6px;font-family:Arial,Helvetica,sans-serif;'
