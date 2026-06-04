@@ -288,7 +288,7 @@ export function useOutreach(): OutreachContextValue & { baseId: string | null; t
             const mapping_id = mappings[0]?.id;
             const pitchUrl   = pitchPageUrl.trim();
             const pitchLabel = pitchPageLabel.trim();
-            const { campaign_id } = await api.createCampaign(
+            const { campaign_id, campaign } = await api.createCampaign(
                 baseId, tableId, goal.trim(), mapping_id,
                 (pitchUrl || pitchLabel)
                     ? { pitch_page_url: pitchUrl || undefined, pitch_page_label: pitchLabel || undefined }
@@ -299,7 +299,10 @@ export function useOutreach(): OutreachContextValue & { baseId: string | null; t
                 try { await api.uploadCampaignDeck(campaign_id, deck); }
                 catch (e: any) { toast.error(`Deck upload failed (campaign created): ${e.message}`); }
             }
-            setActiveCampaign(await api.getCampaign(campaign_id));
+            // Use the full campaign returned by POST /campaigns — saves the
+            // redundant follow-up GET (~ half a round-trip on a cold pool).
+            // Falls back to GET only if the response didn't include it.
+            setActiveCampaign(campaign ?? await api.getCampaign(campaign_id));
             setSegEvents([]);
             navigate("/outreach/segmenting");
         } catch (e: any) {

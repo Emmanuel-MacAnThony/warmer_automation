@@ -13,11 +13,15 @@ const icons: Record<ToastType, React.ReactNode> = {
   warning: <AlertTriangle size={16} />,
 }
 
+// Dark background + light text per type. The /85 alpha keeps the panel readable
+// against any underlying content; the lighter text colour gives high contrast
+// against that dark fill. (The previous `bg-*-300/80 text-*-300` was light-on-
+// light — the text disappeared into the background.)
 const styles: Record<ToastType, string> = {
-  success: 'border-teal-300/40 bg-teal-300/80 text-teal-300',
-  error:   'border-red-500/40    bg-red-950/80    text-red-300',
-  info:    'border-blue-500/40   bg-blue-950/80   text-blue-300',
-  warning: 'border-yellow-500/40 bg-yellow-950/80 text-yellow-300',
+  success: 'border-teal-400/40    bg-teal-950/85    text-teal-100',
+  error:   'border-red-500/40     bg-red-950/85     text-red-100',
+  info:    'border-blue-500/40    bg-blue-950/85    text-blue-100',
+  warning: 'border-yellow-500/40  bg-yellow-950/85  text-yellow-100',
 }
 
 function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) {

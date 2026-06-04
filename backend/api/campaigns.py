@@ -64,9 +64,17 @@ class BatchSendRequest(BaseModel):
 
 @router.post("/campaigns")
 async def create_campaign(request: CreateCampaignRequest):
-    """Create a campaign and immediately start the segmentation pipeline."""
+    """
+    Create a campaign and immediately start the segmentation pipeline.
+
+    Returns the full campaign row so the frontend doesn't need a follow-up
+    GET — eliminates one round-trip on what was a 3-call create flow.
+    """
     try:
-        from backend.infra.db.campaign_repo import create_campaign as db_create_campaign
+        from backend.infra.db.campaign_repo import (
+            create_campaign as db_create_campaign,
+            get_campaign as db_get_campaign,
+        )
         from backend.agents.segmentation import run_segmentation, register
 
         campaign_id = await db_create_campaign(
@@ -88,8 +96,15 @@ async def create_campaign(request: CreateCampaignRequest):
             ),
             name=f"segment-{campaign_id}",
         )
+        # Fetch the full row so the response is ready-to-use on the frontend.
+        # Single SELECT against the row we just inserted — fast, same pool.
+        campaign = await db_get_campaign(campaign_id)
         logger.info(f"Campaign {campaign_id}: created and segmentation started")
-        return {"campaign_id": campaign_id, "status": "segmenting"}
+        return {
+            "campaign_id": campaign_id,
+            "status": "segmenting",
+            "campaign": campaign,
+        }
     except Exception as e:
         logger.error(f"Failed to create campaign: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": "Internal server error"})
@@ -400,8 +415,15 @@ async def preview_campaign_template(campaign_id: int, tier: str, request: Previe
     if tier not in ("tier_1", "tier_2", "tier_3"):
         return JSONResponse(status_code=400, content={"error": f"Invalid tier: {tier}"})
     try:
-        from backend.infra.db.campaign_repo import sample_queue
+        from backend.infra.db.campaign_repo import get_campaign, sample_queue
+        from backend.outreach.link_rewriter import render_with_tracking
         from backend.outreach.variable_resolver import resolve
+
+        # Pull the campaign once so the preview can show the auto-appended CTA
+        # exactly as it'll go out at send time.
+        camp = await get_campaign(campaign_id)
+        pitch_page_url   = camp.get("pitch_page_url")   if camp else None
+        pitch_page_label = camp.get("pitch_page_label") if camp else None
 
         contacts = await sample_queue(campaign_id, tier, request.count)
         results = []
@@ -411,6 +433,16 @@ async def preview_campaign_template(campaign_id: int, tier: str, request: Previe
             wp       = c.get("warm_path_data")
             subj, rs = resolve(request.subject, snap, score, wp, tier)
             body, rb = resolve(request.body,    snap, score, wp, tier)
+            # Apply the same link-rewriter + pitch-page-CTA append used at send
+            # time, so the fundraiser sees the exact body that will go out and
+            # can click-test the tracked CTA before approving. Preview clicks
+            # log without enrollment attribution (eid=0 in the URL).
+            body = render_with_tracking(
+                body,
+                enrollment_id=None,
+                pitch_page_url=pitch_page_url,
+                pitch_page_label=pitch_page_label,
+            )
             results.append({
                 "contact_id":       c["id"],
                 "contact_name":     snap.get("name", "Unknown"),

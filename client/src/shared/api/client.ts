@@ -601,7 +601,9 @@ export const api = {
     mapping_id?: number,
     extras?: { pitch_page_url?: string; pitch_page_label?: string },
   ) =>
-    request<{ campaign_id: number; status: string }>('/campaigns', {
+    // Returns the full campaign in the response so callers don't need a
+    // follow-up GET.
+    request<{ campaign_id: number; status: string; campaign: Campaign | null }>('/campaigns', {
       method: 'POST',
       body: JSON.stringify({ base_id, table_id, goal, mapping_id, ...(extras ?? {}) }),
     }),
