@@ -155,11 +155,25 @@ select { cursor: pointer; }
     linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
   background-size: 36px 36px;
 }
+/*
+ * Dark-mode grid: a wider, fainter grid PLUS a top-anchored radial vignette
+ * that fades the lines into the background colour, so the surface feels like
+ * one continuous dark plane with structure at the top that dissolves away
+ * — the reference's "blend with the background" effect.
+ *
+ * background-attachment: fixed keeps the gradient locked to the viewport so
+ * the vignette stays at the top while content scrolls underneath, instead
+ * of scrolling away with it.
+ */
 .dark .bg-grid {
   background-image:
-    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-  background-size: 36px 36px;
+    radial-gradient(140% 80% at 50% 0%, transparent 38%, var(--background) 100%),
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 100% 100%, 64px 64px, 64px 64px;
+  background-repeat: no-repeat, repeat, repeat;
+  background-attachment: fixed;
+  background-position: center top;
 }
 
 @keyframes shimmer-slide {
