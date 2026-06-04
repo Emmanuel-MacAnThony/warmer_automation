@@ -25,7 +25,7 @@ const WEIGHT_LABELS: Record<string, string> = {
 };
 
 const TIER_META = [
-    { key: "tier_1" as const, label: "Tier 1", sub: "Warmest", color: "bg-emerald-500", text: "text-emerald-400" },
+    { key: "tier_1" as const, label: "Tier 1", sub: "Warmest", color: "bg-teal-300", text: "text-teal-300" },
     { key: "tier_2" as const, label: "Tier 2", sub: "Solid", color: "bg-blue-500", text: "text-blue-400" },
     { key: "tier_3" as const, label: "Tier 3", sub: "Broader", color: "bg-muted-foreground/40", text: "text-muted-foreground" },
 ];
@@ -78,7 +78,7 @@ export function SegmentingView() {
             <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     {complete ? (
-                        <Check size={15} className="text-emerald-400" />
+                        <Check size={15} className="text-teal-300" />
                     ) : error ? (
                         <AlertTriangle size={15} className="text-red-400" />
                     ) : (
@@ -112,7 +112,7 @@ export function SegmentingView() {
                             <div className="flex flex-col items-center self-stretch">
                                 <div className={cn(
                                     "h-7 w-7 rounded-full flex items-center justify-center shrink-0 transition-colors border",
-                                    isDone ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                                    isDone ? "bg-teal-300/15 border-teal-300/30 text-teal-300"
                                         : isActive ? "bg-primary/15 border-primary/40 text-primary"
                                         : "bg-muted/20 border-border/40 text-muted-foreground/30",
                                 )}>
@@ -123,7 +123,7 @@ export function SegmentingView() {
                                 {idx < STAGES.length - 1 && (
                                     <div className={cn(
                                         "w-px flex-1 my-1 min-h-4 transition-colors",
-                                        isDone ? "bg-emerald-500/30" : "bg-border/40",
+                                        isDone ? "bg-teal-300/30" : "bg-border/40",
                                     )} />
                                 )}
                             </div>
@@ -244,7 +244,7 @@ export function SegmentingView() {
             {complete && (
                 <motion.div
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    className="flex items-center gap-2 text-xs text-emerald-500 font-mono"
+                    className="flex items-center gap-2 text-xs text-teal-300 font-mono"
                 >
                     <Check size={13} /> Complete — loading tiers…
                 </motion.div>

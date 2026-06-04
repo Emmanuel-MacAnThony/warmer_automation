@@ -47,8 +47,8 @@ export function CreateCampaignView() {
                     onChange={(e) => setDeck(e.target.files?.[0] ?? null)}
                 />
                 {deck ? (
-                    <div className="flex items-center gap-2.5 rounded-md border border-emerald-500/25 bg-emerald-500/8 px-3 py-2">
-                        <FileText size={13} className="text-emerald-400 shrink-0" />
+                    <div className="flex items-center gap-2.5 rounded-md border border-teal-300/25 bg-teal-300/8 px-3 py-2">
+                        <FileText size={13} className="text-teal-300 shrink-0" />
                         <span className="flex-1 text-[12px] font-mono text-foreground/80 truncate">{deck.name}</span>
                         <button onClick={() => setDeck(null)} className="text-muted-foreground/40 hover:text-red-400 transition-colors shrink-0">
                             <X size={13} />

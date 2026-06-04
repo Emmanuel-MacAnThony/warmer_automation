@@ -237,7 +237,7 @@ export function EditorStep() {
                                 const esc = v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
                                 const hasFb = new RegExp(`\\[${esc}\\s*\\|\\s*fallback:`, "i").test(subject + "\n" + body);
                                 const colors = mapped
-                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50"
+                                    ? "border-teal-300/30 bg-teal-300/10 text-teal-300 hover:bg-teal-300/20 hover:border-teal-300/50"
                                     : hasFb
                                       ? "border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:border-blue-500/50"
                                       : "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50";
@@ -456,8 +456,8 @@ export function EditorStep() {
 
                                 {/* Server-configured provider (smtp / resend) — no account picker */}
                                 {!needsAccount && (
-                                    <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 flex items-center gap-2.5">
-                                        <div className="h-7 w-7 rounded-md flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-400">
+                                    <div className="rounded-md border border-teal-300/20 bg-teal-300/5 px-3 py-2.5 flex items-center gap-2.5">
+                                        <div className="h-7 w-7 rounded-md flex items-center justify-center shrink-0 bg-teal-300/15 text-teal-300">
                                             <Mail size={13} />
                                         </div>
                                         <div className="flex-1 min-w-0">
@@ -505,17 +505,17 @@ export function EditorStep() {
                                                 className={cn(
                                                     "rounded-md border px-3 py-2 flex items-center gap-2.5 cursor-pointer transition-colors",
                                                     selected
-                                                        ? "border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/8"
+                                                        ? "border-teal-300/20 bg-teal-300/5 hover:bg-teal-300/8"
                                                         : "border-border/40 bg-muted/10 hover:bg-muted/20",
                                                 )}
                                             >
                                                 <div className={cn(
                                                     "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
-                                                    selected ? "border-emerald-500/60 bg-emerald-500/20" : "border-border/50",
+                                                    selected ? "border-teal-300/60 bg-teal-300/20" : "border-border/50",
                                                 )}>
-                                                    {selected && <Check size={9} className="text-emerald-400" />}
+                                                    {selected && <Check size={9} className="text-teal-300" />}
                                                 </div>
-                                                <div className="h-6 w-6 rounded flex items-center justify-center shrink-0 bg-emerald-500/10 text-emerald-400">
+                                                <div className="h-6 w-6 rounded flex items-center justify-center shrink-0 bg-teal-300/10 text-teal-300">
                                                     <Mail size={11} />
                                                 </div>
                                                 <span className="flex-1 text-[12px] font-mono text-foreground/80 truncate">{account.email}</span>
@@ -661,7 +661,7 @@ export function EditorStep() {
                             <span className={cn(
                                 "px-2 py-1 rounded-md text-[11px] font-mono font-semibold border",
                                 finalScore >= 8
-                                    ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/25"
+                                    ? "text-teal-300 bg-teal-300/10 border-teal-300/25"
                                     : finalScore >= 6
                                         ? "text-amber-400 bg-amber-500/10 border-amber-500/25"
                                         : "text-red-400 bg-red-500/10 border-red-500/25",

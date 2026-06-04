@@ -25,7 +25,7 @@ function fmtRel(iso: string): string {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-    active:    "text-emerald-400 bg-emerald-500/10 border-emerald-500/25",
+    active:    "text-teal-300 bg-teal-300/10 border-teal-300/25",
     paused:    "text-amber-400 bg-amber-500/10 border-amber-500/25",
     draft:     "text-muted-foreground bg-muted/40 border-border/40",
     completed: "text-blue-400 bg-blue-500/10 border-blue-500/25",
@@ -69,7 +69,7 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
     const metrics = [
         { label: "Active",  value: s.active,    color: "text-primary",
           hint: "Contacts still in the pipeline — includes those waiting between steps (e.g. between send 1 and the 3-day follow-up)." },
-        { label: "Replied", value: s.replied,   color: s.replied > 0 ? "text-emerald-500" : "text-muted-foreground/50",
+        { label: "Replied", value: s.replied,   color: s.replied > 0 ? "text-teal-300" : "text-muted-foreground/50",
           hint: "Replied — sequence stopped for them." },
         { label: "Done",    value: s.completed, color: "text-muted-foreground/70",
           hint: "Reached the final step." },
@@ -177,7 +177,7 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
                             disabled={!clickable}
                             className={cn(
                                 "flex-1 flex flex-col items-center justify-center px-3 py-3 transition-colors",
-                                clickable && isReplied ? "hover:bg-emerald-500/5 cursor-pointer" :
+                                clickable && isReplied ? "hover:bg-teal-300/5 cursor-pointer" :
                                 clickable && isBounced ? "hover:bg-red-500/5 cursor-pointer" :
                                 "cursor-default",
                             )}
@@ -226,7 +226,7 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
                         </span>
                     )}
                     {s.replied > 0 && (
-                        <span className="ml-auto font-mono text-emerald-500/70 tabular-nums" title={`${s.replied} of ${s.total} replied`}>
+                        <span className="ml-auto font-mono text-teal-300/70 tabular-nums" title={`${s.replied} of ${s.total} replied`}>
                             {Math.round((s.replied / s.total) * 100)}% replied
                         </span>
                     )}
@@ -235,14 +235,14 @@ export function SequenceCard({ seq, onToggle, onDelete }: { seq: Sequence; onTog
 
             {/* Hot leads — who replied */}
             {expanded === "replies" && (
-                <div className="border-t border-emerald-500/15 bg-emerald-500/5 px-4 py-2.5">
+                <div className="border-t border-teal-300/15 bg-teal-300/5 px-4 py-2.5">
                     {loadingReplies ? (
                         <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 size={11} className="animate-spin" /> Loading replies…</div>
                     ) : !replies || replies.length === 0 ? (
                         <p className="text-[11px] text-muted-foreground/50">No replies captured yet.</p>
                     ) : (
                         <div className="space-y-1.5">
-                            <p className="text-[9px] font-mono uppercase tracking-widest text-emerald-400/60">Replied — follow up personally</p>
+                            <p className="text-[9px] font-mono uppercase tracking-widest text-teal-300/60">Replied — follow up personally</p>
                             {replies.map((r, i) => (
                                 <div key={i} className="flex items-center gap-2 text-[11px]">
                                     <span className="text-foreground/80 truncate">{r.name}</span>

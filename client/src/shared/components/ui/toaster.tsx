@@ -14,7 +14,7 @@ const icons: Record<ToastType, React.ReactNode> = {
 }
 
 const styles: Record<ToastType, string> = {
-  success: 'border-emerald-500/40 bg-emerald-950/80 text-emerald-300',
+  success: 'border-teal-300/40 bg-teal-300/80 text-teal-300',
   error:   'border-red-500/40    bg-red-950/80    text-red-300',
   info:    'border-blue-500/40   bg-blue-950/80   text-blue-300',
   warning: 'border-yellow-500/40 bg-yellow-950/80 text-yellow-300',

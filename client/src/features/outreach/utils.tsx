@@ -56,7 +56,7 @@ export function highlightSlots(text: string, knownSet: Set<string> = new Set()) 
                     className={cn(
                         "rounded-[2px] not-italic",
                         mapped
-                            ? "bg-emerald-500/15 text-emerald-400/80"
+                            ? "bg-teal-300/15 text-teal-300/80"
                             : hasFallback
                               ? "bg-blue-500/15 text-blue-400/70"
                               : "bg-amber-500/20 text-amber-400",

@@ -42,8 +42,8 @@ export function QueueView() {
                     </div>
                 ) : !contact ? (
                     <div className="flex flex-col items-center justify-center h-48 gap-4 text-center p-8">
-                        <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                            <CheckCircle2 size={20} className="text-emerald-500" />
+                        <div className="h-10 w-10 rounded-xl bg-teal-300/10 flex items-center justify-center">
+                            <CheckCircle2 size={20} className="text-teal-300" />
                         </div>
                         <div>
                             <p className="text-xs font-mono font-medium uppercase tracking-widest text-muted-foreground">Queue complete</p>
@@ -63,10 +63,10 @@ export function QueueView() {
                                 <div className="space-y-1.5">
                                     <div className="flex items-start justify-between gap-3">
                                         <h2 className="text-base font-semibold text-foreground/85 leading-snug">{snap?.name ?? "—"}</h2>
-                                        <div className="inline-flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-md border border-emerald-500/25 bg-emerald-500/10">
-                                            <div className="h-1.5 w-1.5 rounded-full shrink-0 bg-emerald-600 dark:bg-emerald-400" />
-                                            <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400">{tierLabel}</span>
-                                            <span className="text-xs font-mono text-emerald-600/70 dark:text-emerald-400/55">
+                                        <div className="inline-flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-md border border-teal-300/25 bg-teal-300/10">
+                                            <div className="h-1.5 w-1.5 rounded-full shrink-0 bg-teal-300 dark:bg-teal-300" />
+                                            <span className="text-xs font-mono text-teal-300 dark:text-teal-300">{tierLabel}</span>
+                                            <span className="text-xs font-mono text-teal-300/70 dark:text-teal-300/55">
                                                 · {Math.round(contact.composite_score * 100)}%
                                             </span>
                                         </div>
@@ -82,7 +82,7 @@ export function QueueView() {
                                     {((signals && Object.values(signals).some(Boolean)) || contact.warm_path_data?.connector) && (
                                         <button
                                             onClick={() => setShowSignals(true)}
-                                            className="mt-2 flex items-center gap-1.5 text-sm font-medium text-emerald-500/70 hover:text-emerald-500 transition-colors"
+                                            className="mt-2 flex items-center gap-1.5 text-sm font-medium text-teal-300/70 hover:text-teal-300 transition-colors"
                                         >
                                             <Telescope size={13} /> View Signals
                                         </button>

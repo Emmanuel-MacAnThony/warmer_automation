@@ -18,7 +18,7 @@ export function QueueSidebar() {
                 <div className="flex items-center justify-between mb-1.5">
                     <button
                         onClick={() => setView("list")}
-                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-emerald-500/25 bg-emerald-500/10 text-xs font-mono text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15 transition-colors"
+                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-teal-300/25 bg-teal-300/10 text-xs font-mono text-teal-300 dark:text-teal-300 hover:bg-teal-300/15 transition-colors"
                     >
                         <ArrowLeft size={11} /> {tierLabel}
                     </button>

@@ -1,7 +1,8 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* Fonts loaded via <link> in index.html — keeping them out of CSS avoids the
+   PostCSS "@import must precede all other statements" warning + extra HMR work. */
 
 @custom-variant dark (&:is(.dark *));
 
@@ -91,6 +92,10 @@
 }
 
 /* ─── Dark mode — Starlink-inspired ────────────────────── */
+/* Primary is a soft teal (rather than vivid emerald) so CTAs blend with the
+   dark surface instead of shouting. The semantic teal-* classes used for
+   "replied / success / online" status stay as-is — they're meaningfully
+   different (a positive result, not a primary action). */
 .dark {
   --background: #060C18;
   --foreground: #E2E8F0;
@@ -98,27 +103,27 @@
   --card-foreground: #E2E8F0;
   --popover: #0F1A30;
   --popover-foreground: #E2E8F0;
-  --primary: #22C55E;
-  --primary-foreground: #0A1F0A;
+  --primary: #5EEAD4;
+  --primary-foreground: #04121A;
   --secondary: #111E35;
   --secondary-foreground: #94A3B8;
   --muted: #111E35;
   --muted-foreground: #64748B;
-  --accent: #0D2B14;
-  --accent-foreground: #86EFAC;
+  --accent: #0F2A2A;
+  --accent-foreground: #99F6E4;
   --destructive: #EF4444;
   --border: #1C2A40;
   --input: #1C2A40;
-  --ring: #22C55E;
+  --ring: #5EEAD4;
   --sidebar: #080E1E;
   --sidebar-foreground: #E2E8F0;
-  --sidebar-primary: #22C55E;
-  --sidebar-primary-foreground: #0A1F0A;
+  --sidebar-primary: #5EEAD4;
+  --sidebar-primary-foreground: #04121A;
   --sidebar-accent: #111E35;
   --sidebar-accent-foreground: #94A3B8;
   --sidebar-border: #1C2A40;
-  --sidebar-ring: #22C55E;
-  --chart-1: #22C55E;
+  --sidebar-ring: #5EEAD4;
+  --chart-1: #5EEAD4;
   --chart-2: #10B981;
   --chart-3: #F59E0B;
   --chart-4: #A78BFA;

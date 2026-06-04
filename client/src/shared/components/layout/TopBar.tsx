@@ -34,14 +34,14 @@ export function TopBar(_props: TopBarProps) {
           online === null
             ? 'border-border/50 text-muted-foreground/50'
             : online
-            ? 'border-emerald-500/20 text-emerald-400/80 bg-emerald-500/5'
+            ? 'border-teal-300/20 text-teal-300/80 bg-teal-300/5'
             : 'border-red-500/20 text-red-400/80 bg-red-500/5'
         }`}
       >
         {online === null ? (
           <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
         ) : online ? (
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-300 animate-pulse" />
         ) : (
           <WifiOff size={11} />
         )}

@@ -73,7 +73,7 @@ export function Jobs() {
                                 onClick={() => void loadAll(config.baseId, config.tableId)}
                                 disabled={loading}
                             >
-                                <RefreshCw size={14} className={cn(loading && "animate-spin")} />
+                                <RefreshCw size={14} className={cn(loading && "animate-spin text-primary")} />
                             </Button>
                         )}
                     </div>

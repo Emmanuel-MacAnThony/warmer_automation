@@ -102,13 +102,13 @@ export function BatchView({
                         {campaign[`${tier}_insight` as keyof typeof campaign] && (
                             <div className="mt-6 relative">
                                 <div
-                                    className="absolute -top-2.5 left-0 z-10 h-5 flex items-center px-3 bg-emerald-500/15 text-[9px] font-mono uppercase tracking-widest text-emerald-400/60"
+                                    className="absolute -top-2.5 left-0 z-10 h-5 flex items-center px-3 bg-teal-300/15 text-[9px] font-mono uppercase tracking-widest text-teal-300/60"
                                     style={{ clipPath: "polygon(0% 0%, calc(100% - 10px) 0%, 100% 100%, 0% 100%)" }}
                                 >
                                     Tier summary
                                 </div>
                                 <div className="px-3 pt-3.5 pb-2 rounded-md bg-muted/40">
-                                    <p className="text-[11px] font-mono leading-relaxed text-emerald-400/80">
+                                    <p className="text-[11px] font-mono leading-relaxed text-teal-300/80">
                                         {campaign[`${tier}_insight` as keyof typeof campaign] as string}
                                     </p>
                                 </div>

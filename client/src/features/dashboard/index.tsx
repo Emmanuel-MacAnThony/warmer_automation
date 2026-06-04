@@ -101,7 +101,7 @@ export function Dashboard() {
       >
         <StatCard label="Total Jobs"  value={total}     icon={<Briefcase   size={20} />} color="text-foreground" />
         <StatCard label="Running"     value={running}   icon={<Loader2     size={20} />} color="text-cyan-400" />
-        <StatCard label="Completed"   value={completed} icon={<CheckCircle size={20} />} color="text-emerald-400" />
+        <StatCard label="Completed"   value={completed} icon={<CheckCircle size={20} />} color="text-teal-300" />
         <StatCard label="Failed"      value={failed}    icon={<XCircle     size={20} />} color="text-red-400" />
       </motion.div>
 

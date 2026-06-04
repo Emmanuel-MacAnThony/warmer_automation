@@ -6,7 +6,7 @@ const statusConfig: Record<JobStatus, { dot: string; label: string; bg: string; 
   pending:   { dot: 'bg-muted-foreground',  label: 'Pending',   bg: 'bg-muted',          text: 'text-muted-foreground' },
   running:   { dot: 'bg-cyan-500',           label: 'Running',   bg: 'bg-cyan-500/10',    text: 'text-cyan-400' },
   paused:    { dot: 'bg-amber-500',         label: 'Paused',    bg: 'bg-amber-500/10',   text: 'text-amber-400' },
-  completed: { dot: 'bg-emerald-500',       label: 'Completed', bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
+  completed: { dot: 'bg-teal-300',       label: 'Completed', bg: 'bg-teal-300/10', text: 'text-teal-300' },
   failed:    { dot: 'bg-red-500',           label: 'Failed',    bg: 'bg-red-500/10',     text: 'text-red-400' },
 }
 

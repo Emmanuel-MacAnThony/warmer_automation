@@ -89,7 +89,7 @@ export function CampaignCard({
                         {sentenceCase(campaign.goal)}
                     </p>
                     {campaign.emails_sent > 0 && (
-                        <span className="inline-flex items-center gap-1.5 mt-2 px-2 py-0.5 rounded-md border border-emerald-500/25 bg-emerald-500/10 text-xs font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
+                        <span className="inline-flex items-center gap-1.5 mt-2 px-2 py-0.5 rounded-md border border-teal-300/25 bg-teal-300/10 text-xs font-mono text-teal-300 dark:text-teal-300 tabular-nums">
                             <Mail size={11} /> {campaign.emails_sent.toLocaleString()} emails sent
                         </span>
                     )}
@@ -175,10 +175,10 @@ export function CampaignCard({
                                                             const reached = s.sent;
                                                             const coverage = s.total > 0 ? Math.round((reached / s.total) * 100) : 0;
                                                             const st = [
-                                                                { label: "Leads", display: s.total.toLocaleString(), color: "text-emerald-400/80" },
-                                                                { label: "Of Pool", display: `${Math.round((s.total / total) * 100)}%`, color: "text-emerald-400/80" },
-                                                                { label: "Reached", display: reached.toLocaleString(), color: reached > 0 ? "text-emerald-500" : "text-muted-foreground/50" },
-                                                                { label: "Coverage", display: `${coverage}%`, color: coverage > 0 ? "text-emerald-500" : "text-muted-foreground/50" },
+                                                                { label: "Leads", display: s.total.toLocaleString(), color: "text-teal-300/80" },
+                                                                { label: "Of Pool", display: `${Math.round((s.total / total) * 100)}%`, color: "text-teal-300/80" },
+                                                                { label: "Reached", display: reached.toLocaleString(), color: reached > 0 ? "text-teal-300" : "text-muted-foreground/50" },
+                                                                { label: "Coverage", display: `${coverage}%`, color: coverage > 0 ? "text-teal-300" : "text-muted-foreground/50" },
                                                             ];
                                                             return (
                                                                 <div>

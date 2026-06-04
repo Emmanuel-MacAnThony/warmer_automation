@@ -47,7 +47,7 @@ export const TIER_CONFIG: Record<
 };
 
 export const CAMPAIGN_STATUS_COLOR: Record<string, string> = {
-    ready: "bg-emerald-500",
+    ready: "bg-teal-300",
     in_progress: "bg-blue-500",
     segmenting: "bg-amber-500",
     failed: "bg-red-500",

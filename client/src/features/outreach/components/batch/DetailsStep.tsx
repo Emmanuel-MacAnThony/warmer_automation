@@ -38,7 +38,7 @@ export function DetailsStep() {
                     className={cn(
                         "rounded-xl border overflow-hidden",
                         activeJob.status === "running"   ? "border-primary/20 bg-primary/5"
-                        : activeJob.status === "completed"  ? "border-emerald-500/20 bg-emerald-500/5"
+                        : activeJob.status === "completed"  ? "border-teal-300/20 bg-teal-300/5"
                         : activeJob.status === "failed"     ? "border-red-500/20 bg-red-500/5"
                         : activeJob.status === "cancelled"  ? "border-border/40 bg-muted/10"
                         : /* pending | paused */               "border-amber-500/20 bg-amber-500/5",
@@ -49,7 +49,7 @@ export function DetailsStep() {
                             className={cn(
                                 "h-2 w-2 rounded-full shrink-0",
                                 activeJob.status === "running"   ? "bg-primary/70 animate-pulse"
-                                : activeJob.status === "completed"  ? "bg-emerald-500"
+                                : activeJob.status === "completed"  ? "bg-teal-300"
                                 : activeJob.status === "failed"     ? "bg-red-500"
                                 : activeJob.status === "cancelled"  ? "bg-muted-foreground/30"
                                 : activeJob.status === "paused"     ? "bg-amber-400"
@@ -60,7 +60,7 @@ export function DetailsStep() {
                             className={cn(
                                 "text-[11px] font-mono font-semibold uppercase tracking-widest",
                                 activeJob.status === "running"   ? "text-primary/80"
-                                : activeJob.status === "completed"  ? "text-emerald-500/80"
+                                : activeJob.status === "completed"  ? "text-teal-300/80"
                                 : activeJob.status === "failed"     ? "text-red-400"
                                 : activeJob.status === "cancelled"  ? "text-muted-foreground/40"
                                 : activeJob.status === "paused"     ? "text-amber-400"
@@ -94,7 +94,7 @@ export function DetailsStep() {
                                 <button
                                     onClick={handleResumeJob}
                                     title="Resume job"
-                                    className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground/40 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                                    className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground/40 hover:text-teal-300 hover:bg-teal-300/10 transition-colors"
                                 >
                                     <Play size={11} />
                                 </button>
