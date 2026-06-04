@@ -34,7 +34,7 @@ export function useOutreach(): OutreachContextValue & { baseId: string | null; t
     // setView is a thin navigate wrapper — all existing call sites work unchanged
     const setView = (v: View) => navigate(v === "list" ? "/outreach" : `/outreach/${v}`);
 
-    const [listTab, setListTab] = useState<"campaigns" | "jobs" | "sequences" | "suppressions">("campaigns");
+    const [listTab, setListTab] = useState<"campaigns" | "jobs" | "sequences">("campaigns");
 
     // ── Campaigns ─────────────────────────────────────────────────────────────
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -46,6 +46,8 @@ export function useOutreach(): OutreachContextValue & { baseId: string | null; t
 
     // ── Create ────────────────────────────────────────────────────────────────
     const [goal, setGoal] = useState("");
+    const [pitchPageUrl, setPitchPageUrl] = useState("");
+    const [pitchPageLabel, setPitchPageLabel] = useState("");
     const [creating, setCreating] = useState(false);
 
     // ── Batch email jobs ──────────────────────────────────────────────────────
@@ -284,7 +286,14 @@ export function useOutreach(): OutreachContextValue & { baseId: string | null; t
         try {
             const mappings = await api.listMappings(baseId, tableId);
             const mapping_id = mappings[0]?.id;
-            const { campaign_id } = await api.createCampaign(baseId, tableId, goal.trim(), mapping_id);
+            const pitchUrl   = pitchPageUrl.trim();
+            const pitchLabel = pitchPageLabel.trim();
+            const { campaign_id } = await api.createCampaign(
+                baseId, tableId, goal.trim(), mapping_id,
+                (pitchUrl || pitchLabel)
+                    ? { pitch_page_url: pitchUrl || undefined, pitch_page_label: pitchLabel || undefined }
+                    : undefined,
+            );
             // Optional campaign deck — best-effort; segmentation proceeds regardless.
             if (deck) {
                 try { await api.uploadCampaignDeck(campaign_id, deck); }
@@ -358,6 +367,8 @@ export function useOutreach(): OutreachContextValue & { baseId: string | null; t
         deleting, confirmDelete,
         openCampaign,
         goal, setGoal,
+        pitchPageUrl, setPitchPageUrl,
+        pitchPageLabel, setPitchPageLabel,
         creating, handleCreate,
         batchEmailJobs, loadingBatchEmailJobs,
         deleteBatchEmailTarget, setDeleteBatchEmailTarget,

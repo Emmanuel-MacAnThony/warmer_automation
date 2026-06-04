@@ -5,6 +5,8 @@ import { CreateCampaignView } from "./components/CreateCampaignView";
 import { NoTableSelected } from "./components/NoTableSelected";
 import { QueueView } from "./components/QueueView";
 import { SegmentingView } from "./components/SegmentingView";
+import { SequenceDetailView } from "./components/SequenceDetailView";
+import { SuppressionsView } from "./components/SuppressionsView";
 import { OutreachContext } from "./context/OutreachContext";
 import { useOutreach } from "./hooks/useOutreach";
 
@@ -29,6 +31,18 @@ export function Outreach() {
             <Routes>
                 <Route index element={<CampaignListView />} />
                 <Route path="creating" element={<CreateCampaignView />} />
+                <Route path="sequences/:id" element={<SequenceDetailView />} />
+                <Route path="suppressions" element={
+                    <div className="p-6 max-w-4xl mx-auto space-y-5">
+                        <button
+                            onClick={() => navigate("/outreach")}
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            ← Back to outreach
+                        </button>
+                        <SuppressionsView />
+                    </div>
+                } />
                 <Route
                     path="segmenting"
                     element={

@@ -1,10 +1,11 @@
 import { Button } from "@/shared/components/ui/button";
-import { ArrowLeft, FileText, Loader2, Megaphone, Paperclip, X } from "lucide-react";
+import { ArrowLeft, FileText, Link2, Loader2, Megaphone, Paperclip, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { useOutreachContext } from "../context/OutreachContext";
 
 export function CreateCampaignView() {
-    const { goal, setGoal, creating, handleCreate, setView } = useOutreachContext();
+    const { goal, setGoal, creating, handleCreate, setView,
+            pitchPageUrl, setPitchPageUrl, pitchPageLabel, setPitchPageLabel } = useOutreachContext();
     const [deck, setDeck] = useState<File | null>(null);
     const deckInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,6 +65,35 @@ export function CreateCampaignView() {
                 )}
                 <p className="text-xs text-muted-foreground/40">
                     Optional. If attached, the email copilot grounds drafts in your real campaign messaging instead of generic copy.
+                </p>
+            </div>
+
+            {/* Optional pitch page — appended to every email as a tracked CTA */}
+            <div className="space-y-2">
+                <label className="text-xs font-mono uppercase tracking-widest text-muted-foreground/50">
+                    Pitch page <span className="normal-case tracking-normal text-muted-foreground/30">(optional)</span>
+                </label>
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <Link2 size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 pointer-events-none" />
+                        <input
+                            type="url"
+                            value={pitchPageUrl}
+                            onChange={(e) => setPitchPageUrl(e.target.value)}
+                            placeholder="https://alpha-city.vc/our-fund"
+                            className="w-full pl-9 pr-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:border-primary/50 transition-colors placeholder:text-muted-foreground/30 font-mono"
+                        />
+                    </div>
+                    <input
+                        type="text"
+                        value={pitchPageLabel}
+                        onChange={(e) => setPitchPageLabel(e.target.value)}
+                        placeholder="Learn more"
+                        className="w-32 px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:border-primary/50 transition-colors placeholder:text-muted-foreground/30"
+                    />
+                </div>
+                <p className="text-xs text-muted-foreground/40 leading-relaxed">
+                    Optional. If you give us a URL (e.g. your one-pager, fund deck, or schedule-a-call page) we automatically append a tracked button to every email in this campaign. Every click is logged so you can see exactly which investors engaged — the strongest interest signal available on Gmail.
                 </p>
             </div>
 

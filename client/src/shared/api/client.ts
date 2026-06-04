@@ -227,9 +227,21 @@ export interface SequenceStats {
   completed: number
   stopped: number
   bounced: number
+  clicks?: number             // total clicks recorded against any enrollment in this sequence
+  unique_clickers?: number    // distinct contacts who clicked at least once
   by_step: Record<string, number>
   next_by_step?: Record<string, string>  // step → ISO timestamp of next scheduled send
   next_send_at?: string | null            // earliest upcoming send across all steps (ISO)
+}
+
+export interface SequenceClick {
+  name: string
+  email: string
+  title: string
+  company: string
+  click_count: number
+  last_link_url: string | null
+  last_click_at: string | null
 }
 
 export interface SequenceStep {
@@ -446,6 +458,9 @@ export const api = {
   getSequenceBounces: (sequenceId: number) =>
     request<{ bounces: SequenceBounce[] }>(`/sequences/${sequenceId}/bounces`).then(r => r.bounces),
 
+  getSequenceClicks: (sequenceId: number) =>
+    request<{ clicks: SequenceClick[] }>(`/sequences/${sequenceId}/clicks`).then(r => r.clicks),
+
   listSuppressions: (opts: { limit?: number; offset?: number; search?: string } = {}) => {
     const qs = new URLSearchParams()
     if (opts.limit !== undefined)  qs.set('limit',  String(opts.limit))
@@ -561,10 +576,16 @@ export const api = {
     request<{ campaigns: Campaign[] }>(`/campaigns?base_id=${base_id}&table_id=${table_id}`)
       .then(r => r.campaigns),
 
-  createCampaign: (base_id: string, table_id: string, goal: string, mapping_id?: number) =>
+  createCampaign: (
+    base_id: string,
+    table_id: string,
+    goal: string,
+    mapping_id?: number,
+    extras?: { pitch_page_url?: string; pitch_page_label?: string },
+  ) =>
     request<{ campaign_id: number; status: string }>('/campaigns', {
       method: 'POST',
-      body: JSON.stringify({ base_id, table_id, goal, mapping_id }),
+      body: JSON.stringify({ base_id, table_id, goal, mapping_id, ...(extras ?? {}) }),
     }),
 
   getCampaign: (id: number) =>

@@ -3,12 +3,12 @@ import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
 import { ConfirmDialog } from "@/shared/components/ui/dialog";
 import { cn } from "@/shared/lib/utils";
-import { Mail, Plus, Target, Repeat } from "lucide-react";
+import { Ban, Mail, Plus, Target, Repeat } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { Tier } from "../types";
 import { useOutreachContext } from "../context/OutreachContext";
 import { CampaignCard } from "./CampaignCard";
 import { SequenceCard } from "./SequenceCard";
-import { SuppressionsView } from "./SuppressionsView";
 
 export function CampaignListView() {
     const {
@@ -87,24 +87,22 @@ export function CampaignListView() {
                         >
                             Sequences
                         </button>
-                        <button
-                            onClick={() => setListTab("suppressions")}
-                            className={cn(
-                                "px-3 py-1 text-xs font-mono font-medium rounded-md transition-all duration-150",
-                                listTab === "suppressions"
-                                    ? "bg-background text-foreground shadow-sm border border-border/60"
-                                    : "text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            Suppressions
-                        </button>
                     </div>
                 </div>
-                {listTab === "campaigns" && (
-                    <Button onClick={() => { setGoal(""); setView("creating"); }} size="sm" className="gap-1.5 shrink-0">
-                        <Plus size={13} /> New
-                    </Button>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                    {listTab === "campaigns" && (
+                        <Button onClick={() => { setGoal(""); setView("creating"); }} size="sm" className="gap-1.5">
+                            <Plus size={13} /> New
+                        </Button>
+                    )}
+                    <Link
+                        to="/outreach/suppressions"
+                        title="Manage the global suppression list (bounced / unsubscribed addresses)"
+                        className="flex items-center gap-1 text-[11px] font-mono uppercase tracking-widest text-muted-foreground/40 hover:text-foreground/70 transition-colors"
+                    >
+                        <Ban size={11} /> Suppressions
+                    </Link>
+                </div>
             </div>
 
             {listTab === "sequences" ? (
@@ -150,8 +148,6 @@ export function CampaignListView() {
                         </div>
                     </>
                 )
-            ) : listTab === "suppressions" ? (
-                <SuppressionsView />
             ) : listTab === "jobs" ? (
                 <>
                     <ConfirmDialog

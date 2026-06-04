@@ -12,8 +12,8 @@ export type OutreachContextValue = {
     // Navigation
     view: View;
     setView: (v: View) => void;
-    listTab: "campaigns" | "jobs" | "sequences" | "suppressions";
-    setListTab: (t: "campaigns" | "jobs" | "sequences" | "suppressions") => void;
+    listTab: "campaigns" | "jobs" | "sequences";
+    setListTab: (t: "campaigns" | "jobs" | "sequences") => void;
 
     // Campaigns
     campaigns: Campaign[];
@@ -32,6 +32,10 @@ export type OutreachContextValue = {
     // Create campaign
     goal: string;
     setGoal: (v: string) => void;
+    pitchPageUrl: string;
+    setPitchPageUrl: (v: string) => void;
+    pitchPageLabel: string;
+    setPitchPageLabel: (v: string) => void;
     creating: boolean;
     handleCreate: (deck?: File) => void;
 
