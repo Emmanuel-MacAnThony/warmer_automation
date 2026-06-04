@@ -1,13 +1,13 @@
 import { cn } from "@/shared/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, BarChart3, Check, Database, Loader2, Save, Sparkles } from "lucide-react";
+import { AlertTriangle, BarChart3, Check, Database, Loader2, Save, Target } from "lucide-react";
 import { useOutreachContext } from "../context/OutreachContext";
 import { sentenceCase } from "../utils";
 
 // Pipeline stages, in order. `step` values come from the backend events.
 const STAGES = [
     { key: "load", label: "Loading contacts", Icon: Database },
-    { key: "rag", label: "Semantic relevance", Icon: Sparkles },
+    { key: "rag", label: "Semantic relevance", Icon: Target },
     { key: "finalize", label: "Scoring & tiering", Icon: BarChart3 },
     { key: "persist", label: "Saving results", Icon: Save },
 ] as const;
