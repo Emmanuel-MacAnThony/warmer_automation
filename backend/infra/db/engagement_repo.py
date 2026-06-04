@@ -124,7 +124,9 @@ async def list_click_contacts_for_batch_job(batch_job_id: int, limit: int = 200)
             LEFT JOIN campaign_contacts cc ON cc.id = ev.campaign_contact_id
             WHERE ev.batch_job_id = $1 AND ev.event_type = 'click'
             GROUP BY cc.id, cc.contact_snapshot
-            ORDER BY last_click_at DESC
+            -- Most-engaged first: multi-click contacts are stronger signals
+            -- than single-click. Recency breaks ties.
+            ORDER BY click_count DESC, last_click_at DESC
             LIMIT $2
             """,
             batch_job_id, limit,
@@ -166,7 +168,9 @@ async def list_click_contacts_for_sequence(sequence_id: int, limit: int = 200) -
             JOIN campaign_contacts cc     ON cc.id = ev.campaign_contact_id
             WHERE se.sequence_id = $1 AND ev.event_type = 'click'
             GROUP BY cc.id, cc.contact_snapshot
-            ORDER BY last_click_at DESC
+            -- Most-engaged first: multi-click contacts are stronger signals
+            -- than single-click. Recency breaks ties.
+            ORDER BY click_count DESC, last_click_at DESC
             LIMIT $2
             """,
             sequence_id, limit,

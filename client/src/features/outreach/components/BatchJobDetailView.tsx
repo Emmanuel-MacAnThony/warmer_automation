@@ -13,6 +13,7 @@ import {
     AlertTriangle,
     ArrowLeft,
     FileText,
+    Flame,
     Link2,
     Loader2,
     MousePointerClick,
@@ -238,7 +239,7 @@ export function BatchJobDetailView() {
             </Section>
 
             {/* Clicked — strongest engagement signal */}
-            <Section icon={MousePointerClick} title={`Clicked (${clickedCount})`} accent="primary">
+            <Section icon={MousePointerClick} title={`Clicked (${clickedCount})`} accent="primary" scrollable>
                 {clicks === null ? (
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 size={11} className="animate-spin" /> Loading…</div>
                 ) : clicks.length === 0 ? (
@@ -250,9 +251,7 @@ export function BatchJobDetailView() {
                         {clicks.map((c, i) => (
                             <div key={i} className="flex items-center gap-2 text-[12px]">
                                 <span className="text-foreground/85 truncate">{c.name}</span>
-                                {c.click_count > 1 && (
-                                    <span className="font-mono text-[10px] text-primary/70" title={`Clicked ${c.click_count} times`}>×{c.click_count}</span>
-                                )}
+                                {clickHotIndicator(c.click_count)}
                                 {(c.title || c.company) && (
                                     <span className="text-muted-foreground/40 truncate hidden sm:inline">{[c.title, c.company].filter(Boolean).join(" · ")}</span>
                                 )}
@@ -266,7 +265,7 @@ export function BatchJobDetailView() {
             </Section>
 
             {/* Bounced */}
-            <Section icon={XCircle} title={`Bounced (${bouncedCount})`} accent="red">
+            <Section icon={XCircle} title={`Bounced (${bouncedCount})`} accent="red" scrollable>
                 {bounces === null ? (
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 size={11} className="animate-spin" /> Loading…</div>
                 ) : bounces.length === 0 ? (
@@ -347,12 +346,37 @@ export function BatchJobDetailView() {
     );
 }
 
+/**
+ * Hot-lead indicator for repeat clickers — mirrors the sequence detail view:
+ *   1 click   → nothing (already in the list)
+ *   2 clicks  → quiet ×N tag
+ *   3+ clicks → flame + ×N — "this one's hot"
+ */
+function clickHotIndicator(count: number): React.ReactNode {
+    if (count <= 1) return null;
+    const isHot = count >= 3;
+    return (
+        <span
+            className={cn(
+                "inline-flex items-center gap-0.5 font-mono text-[10px] shrink-0",
+                isHot ? "text-orange-400" : "text-primary/70",
+            )}
+            title={`Clicked ${count} times${isHot ? " — hot lead" : ""}`}
+        >
+            {isHot && <Flame size={10} className="shrink-0" />}
+            ×{count}
+        </span>
+    );
+}
+
 // ── Sub-components ──────────────────────────────────────────────────────────
 
-function Section({ icon: Icon, title, accent, children }: {
+function Section({ icon: Icon, title, accent, scrollable, children }: {
     icon: React.ComponentType<{ size?: number; className?: string }>;
     title: string;
     accent?: "primary" | "teal" | "red";
+    /** Cap the body height with an inner scroll — used for engagement lists. */
+    scrollable?: boolean;
     children: React.ReactNode;
 }) {
     const accentClass =
@@ -366,7 +390,7 @@ function Section({ icon: Icon, title, accent, children }: {
                 <Icon size={13} className={accentClass} />
                 <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground/70">{title}</h2>
             </div>
-            <div className="px-4 py-3">{children}</div>
+            <div className={cn("px-4 py-3", scrollable && "max-h-96 overflow-y-auto")}>{children}</div>
         </Card>
     );
 }

@@ -12,6 +12,7 @@ import {
     AlertTriangle,
     ArrowLeft,
     Clock,
+    Flame,
     Layers,
     Loader2,
     MessageSquare,
@@ -280,20 +281,20 @@ export function SequenceDetailView() {
                 </Section>
             )}
 
-            {/* Engagement sections */}
-            <Section icon={MousePointerClick} title={`Clicked (${clickedCount})`} accent="primary">
+            {/* Engagement sections — scrollable so long lists don't blow up the page */}
+            <Section icon={MousePointerClick} title={`Clicked (${clickedCount})`} accent="primary" scrollable>
                 <ContactList
                     items={clicks}
                     emptyText="No clicks recorded yet. Add a Pitch Page to your campaign to give every email a tracked CTA."
-                    rowExtra={(c) => c.click_count > 1 ? <span className="font-mono text-[10px] text-primary/70" title={`Clicked ${c.click_count} times`}>×{c.click_count}</span> : null}
+                    rowExtra={(c) => clickHotIndicator(c.click_count)}
                 />
             </Section>
 
-            <Section icon={MessageSquare} title={`Replied (${s.replied})`} accent="teal">
+            <Section icon={MessageSquare} title={`Replied (${s.replied})`} accent="teal" scrollable>
                 <ContactList items={replies} emptyText="No replies captured yet." />
             </Section>
 
-            <Section icon={XCircle} title={`Bounced (${s.bounced})`} accent="red">
+            <Section icon={XCircle} title={`Bounced (${s.bounced})`} accent="red" scrollable>
                 <ContactList
                     items={bounces}
                     emptyText="No bounces yet."
@@ -321,12 +322,41 @@ export function SequenceDetailView() {
     );
 }
 
+/**
+ * Hot-lead indicator for repeat clickers. Tiered:
+ *   1 click   → nothing (just being in the list is the signal)
+ *   2 clicks  → quiet ×N tag
+ *   3+ clicks → flame + ×N — "this one's hot"
+ *
+ * The threshold matches the broader product cue: multiple clicks on the same
+ * link strongly imply a real interested human, not a corporate link-scanner.
+ */
+function clickHotIndicator(count: number): React.ReactNode {
+    if (count <= 1) return null;
+    const isHot = count >= 3;
+    return (
+        <span
+            className={cn(
+                "inline-flex items-center gap-0.5 font-mono text-[10px] shrink-0",
+                isHot ? "text-orange-400" : "text-primary/70",
+            )}
+            title={`Clicked ${count} times${isHot ? " — hot lead" : ""}`}
+        >
+            {isHot && <Flame size={10} className="shrink-0" />}
+            ×{count}
+        </span>
+    );
+}
+
 // ── Sub-components ──────────────────────────────────────────────────────────
 
-function Section({ icon: Icon, title, accent, children }: {
+function Section({ icon: Icon, title, accent, scrollable, children }: {
     icon: React.ComponentType<{ size?: number; className?: string }>;
     title: string;
     accent?: "primary" | "teal" | "red";
+    /** Cap the body height with an inner scroll — for engagement lists that
+     *  may grow unbounded (clicks, replies, bounces). */
+    scrollable?: boolean;
     children: React.ReactNode;
 }) {
     const accentClass =
@@ -340,7 +370,7 @@ function Section({ icon: Icon, title, accent, children }: {
                 <Icon size={13} className={accentClass} />
                 <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground/70">{title}</h2>
             </div>
-            <div className="px-4 py-3">{children}</div>
+            <div className={cn("px-4 py-3", scrollable && "max-h-96 overflow-y-auto")}>{children}</div>
         </Card>
     );
 }
