@@ -2,12 +2,22 @@
 Gmail OAuth endpoints.
 """
 import logging
+import os
 from typing import Optional
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from backend.config import Config
+
+# Google sometimes returns MORE scopes than we requested — e.g. when a user
+# already approved gmail.metadata in a previous grant and we now ask for
+# gmail.readonly, the consent screen merges the two and the token comes
+# back with both. oauthlib's strict scope-equality check then raises
+# "Scope has changed from X to Y". This env var tells oauthlib to accept
+# the superset silently, which is safe (we trust that what we got covers
+# what we asked for).
+os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
