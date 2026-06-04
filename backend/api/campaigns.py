@@ -18,6 +18,10 @@ class CreateCampaignRequest(BaseModel):
     table_id: str
     goal: str = Field(..., min_length=10)
     mapping_id: Optional[int] = None
+    # Optional pitch page. When set, every email sent for this campaign gets a
+    # tracked CTA appended pointing here, so we can measure click engagement.
+    pitch_page_url: Optional[str] = None
+    pitch_page_label: Optional[str] = None
 
 
 class SendContactRequest(BaseModel):
@@ -70,6 +74,8 @@ async def create_campaign(request: CreateCampaignRequest):
             table_id=request.table_id,
             goal=request.goal,
             mapping_id=request.mapping_id,
+            pitch_page_url=(request.pitch_page_url or "").strip() or None,
+            pitch_page_label=(request.pitch_page_label or "").strip() or None,
         )
         register(campaign_id)
         asyncio.create_task(

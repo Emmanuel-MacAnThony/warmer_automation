@@ -445,6 +445,38 @@ CREATE INDEX IF NOT EXISTS email_bounces_batch_idx       ON email_bounces (batch
 -- DSN scan cursor per Gmail account — Gmail history.list resumes from this id
 -- so the poller processes only NEW inbox changes, not the whole inbox each tick.
 ALTER TABLE gmail_tokens ADD COLUMN IF NOT EXISTS last_dsn_history_id TEXT;
+
+-- ── Click engagement tracking (Phase B) ──────────────────────────────────────
+--
+-- Engagement events: a row per recipient action we can attribute to an
+-- enrollment. Today it's clicks via the /r redirect endpoint; the pixel_hit
+-- event_type is reserved so we can layer in delivery-confirmation pings on
+-- the same table later without another migration.
+CREATE TABLE IF NOT EXISTS email_events (
+    id                       SERIAL PRIMARY KEY,
+    sequence_enrollment_id   INT REFERENCES sequence_enrollments(id) ON DELETE SET NULL,
+    batch_job_id             INT REFERENCES batch_send_jobs(id)      ON DELETE SET NULL,
+    campaign_contact_id      INT REFERENCES campaign_contacts(id)    ON DELETE SET NULL,
+    event_type               TEXT NOT NULL CHECK (event_type IN ('click', 'pixel_hit')),
+    link_url                 TEXT,
+    user_agent               TEXT,
+    ip                       TEXT,
+    occurred_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS email_events_sequence_idx
+    ON email_events (sequence_enrollment_id)
+    WHERE sequence_enrollment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS email_events_batch_idx
+    ON email_events (batch_job_id)
+    WHERE batch_job_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS email_events_contact_type_time_idx
+    ON email_events (campaign_contact_id, event_type, occurred_at DESC);
+
+-- Pitch page: an optional canonical URL per campaign. When set, the system
+-- appends a tracked CTA to every email sent on that campaign (sequence OR
+-- batch), so every recipient gets at least one signed, click-loggable link.
+ALTER TABLE outreach_campaigns ADD COLUMN IF NOT EXISTS pitch_page_url   TEXT;
+ALTER TABLE outreach_campaigns ADD COLUMN IF NOT EXISTS pitch_page_label TEXT;
 """
 
 

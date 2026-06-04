@@ -335,6 +335,18 @@ async def bounce_active_enrollments_by_email(email: str) -> int:
         return 0
 
 
+async def get_enrollment_contact_id(enrollment_id: int) -> Optional[int]:
+    """Look up the campaign_contact_id for an enrollment. Used by the /r endpoint
+    to attribute clicks back to the contact for per-contact engagement queries."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT campaign_contact_id FROM sequence_enrollments WHERE id=$1",
+            enrollment_id,
+        )
+    return row["campaign_contact_id"] if row else None
+
+
 async def count_active_enrollments(sequence_id: int) -> int:
     """How many enrollments are still moving through this sequence."""
     pool = await get_pool()
@@ -490,6 +502,17 @@ async def get_sequence_stats(sequence_id: int) -> dict[str, Any]:
             """,
             sequence_id,
         )
+        # Engagement: total clicks + unique clickers for this sequence.
+        clicks_row = await conn.fetchrow(
+            """
+            SELECT COUNT(*)                                     AS clicks,
+                   COUNT(DISTINCT ev.campaign_contact_id)       AS unique_clickers
+            FROM email_events ev
+            JOIN sequence_enrollments se ON se.id = ev.sequence_enrollment_id
+            WHERE se.sequence_id = $1 AND ev.event_type = 'click'
+            """,
+            sequence_id,
+        )
     by_status = {r["status"]: r["n"] for r in status_rows}
     next_dt = [r["next_at"] for r in step_rows if r["next_at"] is not None]
     return {
@@ -499,6 +522,8 @@ async def get_sequence_stats(sequence_id: int) -> dict[str, Any]:
         "completed": by_status.get("completed", 0),
         "stopped":   by_status.get("stopped", 0),
         "bounced":   by_status.get("bounced", 0),
+        "clicks":            int(clicks_row["clicks"]) if clicks_row else 0,
+        "unique_clickers":   int(clicks_row["unique_clickers"]) if clicks_row else 0,
         "by_step":   {r["current_step"]: r["n"] for r in step_rows},
         "next_by_step": {
             r["current_step"]: r["next_at"].isoformat()

@@ -182,6 +182,7 @@ from backend.api.campaigns import router as campaigns_router
 from backend.api.auth import router as auth_router
 from backend.api.sequences import router as sequences_router
 from backend.api.suppressions import router as suppressions_router
+from backend.api.redirect import router as redirect_router
 
 app.include_router(health_router)
 app.include_router(mappings_router)
@@ -190,6 +191,7 @@ app.include_router(campaigns_router)
 app.include_router(auth_router)
 app.include_router(sequences_router)
 app.include_router(suppressions_router)
+app.include_router(redirect_router)
 
 
 # ---------------------------------------------------------------------------

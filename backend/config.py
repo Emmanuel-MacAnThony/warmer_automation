@@ -72,6 +72,18 @@ class Config:
     RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "")
     RESEND_FROM_NAME: str = os.getenv("RESEND_FROM_NAME", "")
 
+    # Click engagement tracking (Phase B). The rewriter rewrites links in
+    # outbound emails to point at <LINK_TRACKING_BASE_URL>/r?eid=…&u=…&s=…
+    # where s is an HMAC-SHA256 of eid|u using LINK_TRACKING_SECRET. Swap
+    # LINK_TRACKING_BASE_URL to a branded short domain later without code
+    # changes. LINK_TRACKING_SECRET should be a random 32+ byte hex string;
+    # changing it invalidates already-sent tracked links (existing emails
+    # in inboxes stop working) — set it once and keep it.
+    LINK_TRACKING_BASE_URL: str = os.getenv(
+        "LINK_TRACKING_BASE_URL", "https://warmer-automation-1.onrender.com"
+    )
+    LINK_TRACKING_SECRET: str = os.getenv("LINK_TRACKING_SECRET", "")
+
     @classmethod
     def google_client_config(cls) -> dict:
         """

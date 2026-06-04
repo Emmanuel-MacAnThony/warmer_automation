@@ -25,6 +25,7 @@ from backend.infra.db import suppression_repo as sup_repo
 from backend.infra.email import MessageRef, OutboundEmail
 from backend.infra.email.factory import build_provider, build_sender
 from backend.outreach.email_validator import has_valid_mx, is_recipient_rejection
+from backend.outreach.link_rewriter import render_with_tracking
 from backend.outreach.variable_resolver import resolve_contact
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,13 @@ _bounce_lock = asyncio.Lock()  # ensure bounce-polls never overlap
 
 
 async def _send_one(
-    sender, due: dict, template: dict, test_recipient: Optional[str]
+    sender,
+    due: dict,
+    template: dict,
+    test_recipient: Optional[str],
+    *,
+    pitch_page_url: Optional[str] = None,
+    pitch_page_label: Optional[str] = None,
 ) -> dict:
     """
     Resolve + send a single step, with the first two layers of bounce detection
@@ -106,9 +113,21 @@ async def _send_one(
             # so this branch should be rare — log and proceed with the send.
             logger.warning(f"[cadence] MX preflight raised for {to_email}: {e}")
 
+    # ── Render with click tracking ─────────────────────────────────────────
+    # Rewrites every <a href> through our /r endpoint and, if the campaign has
+    # a pitch_page_url configured, appends a tracked CTA at the end of the body.
+    # Test recipients still get the same rendering — the test email should look
+    # identical to a production one so the fundraiser can preview the CTA.
+    body_html = render_with_tracking(
+        resolved["rendered_body"],
+        enrollment_id=due.get("enrollment_id"),
+        pitch_page_url=pitch_page_url,
+        pitch_page_label=pitch_page_label,
+    )
+
     # ── Send ───────────────────────────────────────────────────────────────
     result = await sender.send(OutboundEmail(
-        to=to_email, subject=subject, body_html=resolved["rendered_body"],
+        to=to_email, subject=subject, body_html=body_html,
     ))
     ok = bool(result.ok)
     msg_id = getattr(result, "message_id", None)
@@ -178,6 +197,23 @@ async def tick() -> int:
             logger.warning(f"[cadence seq={seq_id}] no sender available: {e}")
             continue
 
+        # Fetch the campaign once per sequence so every enrollment in this loop
+        # uses the same pitch_page_url + pitch_page_label without re-querying.
+        # All enrollments in a sequence share the same campaign_id.
+        pitch_page_url: Optional[str] = None
+        pitch_page_label: Optional[str] = None
+        if enrollments:
+            campaign_id_for_seq = enrollments[0].get("campaign_id")
+            if campaign_id_for_seq is not None:
+                try:
+                    from backend.infra.db.campaign_repo import get_campaign
+                    camp = await get_campaign(campaign_id_for_seq)
+                    if camp:
+                        pitch_page_url = camp.get("pitch_page_url")
+                        pitch_page_label = camp.get("pitch_page_label")
+                except Exception as e:
+                    logger.debug(f"[cadence seq={seq_id}] could not load pitch page: {e}")
+
         for d in enrollments:
             step = steps_by_num.get(d["current_step"])
             if not step:
@@ -191,7 +227,11 @@ async def tick() -> int:
                 continue
 
             try:
-                outcome = await _send_one(sender, d, template, test_recipient)
+                outcome = await _send_one(
+                    sender, d, template, test_recipient,
+                    pitch_page_url=pitch_page_url,
+                    pitch_page_label=pitch_page_label,
+                )
             except Exception as e:
                 logger.warning(f"[cadence seq={seq_id}] send error on enrollment {d['enrollment_id']}: {e}")
                 continue  # leave active → retried next tick

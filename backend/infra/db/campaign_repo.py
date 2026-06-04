@@ -21,17 +21,19 @@ async def create_campaign(
     table_id: str,
     goal: str,
     mapping_id: Optional[int] = None,
+    pitch_page_url: Optional[str] = None,
+    pitch_page_label: Optional[str] = None,
 ) -> int:
     """Insert a new campaign in 'draft' state. Returns campaign id."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO outreach_campaigns (base_id, table_id, goal, mapping_id)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO outreach_campaigns (base_id, table_id, goal, mapping_id, pitch_page_url, pitch_page_label)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id
             """,
-            base_id, table_id, goal, mapping_id,
+            base_id, table_id, goal, mapping_id, pitch_page_url, pitch_page_label,
         )
     campaign_id = row["id"]
     logger.info(f"Created campaign {campaign_id} for {base_id}/{table_id} mapping={mapping_id}")

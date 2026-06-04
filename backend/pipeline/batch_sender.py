@@ -32,6 +32,7 @@ from backend.infra.db.campaign_repo import (
 from backend.infra.email import EmailSender, OutboundEmail
 from backend.infra.email.factory import build_sender
 from backend.outreach.email_validator import has_valid_mx, is_recipient_rejection
+from backend.outreach.link_rewriter import render_with_tracking
 from backend.outreach.variable_resolver import resolve_contact
 
 logger = logging.getLogger(__name__)
@@ -182,6 +183,19 @@ async def run(job_id: int) -> None:
         if test_recipient:
             logger.info(f"[batch_send job={job_id}] TEST MODE — all emails → {test_recipient}")
 
+        # ── Pitch page (campaign-level, applied to every send in this job) ──
+        # Fetched once here so the per-contact loop just reads two local vars.
+        pitch_page_url: str | None = None
+        pitch_page_label: str | None = None
+        try:
+            from backend.infra.db.campaign_repo import get_campaign
+            camp = await get_campaign(job["campaign_id"])
+            if camp:
+                pitch_page_url = camp.get("pitch_page_url")
+                pitch_page_label = camp.get("pitch_page_label")
+        except Exception as e:
+            logger.debug(f"[batch_send job={job_id}] could not load pitch page: {e}")
+
         # ── Load contacts ────────────────────────────────────────────────────
         contacts = await get_pending_contacts_for_job(
             campaign_id=job["campaign_id"],
@@ -289,10 +303,22 @@ async def run(job_id: int) -> None:
                         )
                         continue
 
+                # Rewrite in-body links + append pitch-page CTA. Batch sends
+                # have no enrollment_id, so clicks log without per-enrollment
+                # attribution (per-contact attribution is recovered at /r time
+                # when a sequence is involved — batch attribution is a known
+                # follow-up if it matters for analytics).
+                body_html = render_with_tracking(
+                    resolved["rendered_body"],
+                    enrollment_id=None,
+                    pitch_page_url=pitch_page_url,
+                    pitch_page_label=pitch_page_label,
+                )
+
                 outbound = OutboundEmail(
                     to=to_email,
                     subject=subject_line,
-                    body_html=resolved["rendered_body"],
+                    body_html=body_html,
                 )
 
                 # Try each active sender; drop rate-limited ones and fall through to the next
