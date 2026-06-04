@@ -304,14 +304,16 @@ async def run(job_id: int) -> None:
                         continue
 
                 # Rewrite in-body links + append pitch-page CTA. Batch sends
-                # carry batch_job_id (instead of enrollment_id) so each click
-                # attributes to this job in email_events.
+                # carry batch_job_id + campaign_contact_id so each click
+                # attributes to both the job AND the specific recipient in
+                # email_events — no "Unknown" rows when contacts click.
                 body_html = render_with_tracking(
                     resolved["rendered_body"],
                     enrollment_id=None,
                     pitch_page_url=pitch_page_url,
                     pitch_page_label=pitch_page_label,
                     batch_job_id=job_id,
+                    campaign_contact_id=contact.get("id"),
                 )
 
                 outbound = OutboundEmail(

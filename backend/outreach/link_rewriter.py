@@ -54,20 +54,31 @@ def _sign(payload: str) -> str:
     return hmac.new(secret, payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def make_signature_payload(eid: str, encoded_url: str, bjid: str = "0") -> str:
+def make_signature_payload(
+    eid: str,
+    encoded_url: str,
+    bjid: str = "0",
+    cid: str = "0",
+) -> str:
     """
-    Canonical payload the signature covers: eid|encoded_url|bjid.
+    Canonical payload the signature covers: eid|encoded_url|bjid|cid.
 
-    bjid is "0" when there's no batch attribution — same convention as eid.
-    Including it in the signature stops tampering (e.g. swapping someone else's
-    bjid to take credit for a click).
+    bjid and cid are "0" when not present — same convention as eid. Including
+    them in the signature stops tampering (e.g. swapping someone else's cid
+    to take credit for or misattribute a click).
     """
-    return f"{eid}|{encoded_url}|{bjid}"
+    return f"{eid}|{encoded_url}|{bjid}|{cid}"
 
 
-def verify_signature(eid: str, encoded_url: str, supplied_sig: str, bjid: str = "0") -> bool:
+def verify_signature(
+    eid: str,
+    encoded_url: str,
+    supplied_sig: str,
+    bjid: str = "0",
+    cid: str = "0",
+) -> bool:
     """Constant-time HMAC comparison for the /r endpoint."""
-    expected = _sign(make_signature_payload(eid, encoded_url, bjid))
+    expected = _sign(make_signature_payload(eid, encoded_url, bjid, cid))
     return hmac.compare_digest(expected, supplied_sig or "")
 
 
@@ -75,25 +86,27 @@ def tracked_url(
     enrollment_id: Optional[int],
     original_url: str,
     batch_job_id: Optional[int] = None,
+    campaign_contact_id: Optional[int] = None,
 ) -> str:
     """
     Build the signed redirect URL for a single original link.
 
-    Both enrollment_id and batch_job_id are optional — sequences pass the
-    enrollment_id (clicks attribute to a specific enrollment/contact); batch
-    jobs pass batch_job_id (clicks attribute to the job + can be linked to
-    the contact via recipient email if needed). A given send carries one or
-    the other, not both.
+    Attribution ids are all optional. Sequences pass enrollment_id; batch
+    sends pass batch_job_id + campaign_contact_id (so each per-contact send
+    gets its own URL that attributes the click to the right recipient).
     """
     if not original_url or not _TRACKABLE_SCHEME_RE.match(original_url):
         return original_url  # not trackable; hand back unchanged
-    eid = str(enrollment_id) if enrollment_id is not None else "0"
-    bjid = str(batch_job_id) if batch_job_id is not None else "0"
+    eid  = str(enrollment_id)        if enrollment_id        is not None else "0"
+    bjid = str(batch_job_id)         if batch_job_id         is not None else "0"
+    cid  = str(campaign_contact_id)  if campaign_contact_id  is not None else "0"
     encoded = _b64url(original_url)
-    sig = _sign(make_signature_payload(eid, encoded, bjid))
+    sig = _sign(make_signature_payload(eid, encoded, bjid, cid))
     params: dict[str, str] = {"eid": eid, "u": encoded, "s": sig}
     if bjid != "0":
         params["bjid"] = bjid
+    if cid != "0":
+        params["cid"] = cid
     qs = urlencode(params)
     base = (Config.LINK_TRACKING_BASE_URL or "").rstrip("/")
     return f"{base}/r?{qs}"
@@ -115,6 +128,7 @@ def rewrite_links_in_body(
     html_body: str,
     enrollment_id: Optional[int],
     batch_job_id: Optional[int] = None,
+    campaign_contact_id: Optional[int] = None,
 ) -> str:
     """
     Walk every <a href="..."> in the body and replace HTTP(S) hrefs with their
@@ -134,7 +148,7 @@ def rewrite_links_in_body(
         prefix, href, suffix = m.group(1), m.group(2), m.group(3)
         if self_redirect_prefix and href.startswith(self_redirect_prefix):
             return m.group(0)  # already tracked — leave alone
-        return f"{prefix}{tracked_url(enrollment_id, href, batch_job_id)}{suffix}"
+        return f"{prefix}{tracked_url(enrollment_id, href, batch_job_id, campaign_contact_id)}{suffix}"
 
     return _HREF_RE.sub(_sub, html_body)
 
@@ -164,6 +178,7 @@ def append_pitch_page_cta(
     pitch_page_label: Optional[str],
     enrollment_id: Optional[int],
     batch_job_id: Optional[int] = None,
+    campaign_contact_id: Optional[int] = None,
 ) -> str:
     """
     Append a tracked CTA at the very end of the email body if the campaign has
@@ -173,7 +188,7 @@ def append_pitch_page_cta(
     if not pitch_page_url or not _TRACKABLE_SCHEME_RE.match(pitch_page_url):
         return html_body
     label = (pitch_page_label or "Learn more").strip() or "Learn more"
-    tracked = tracked_url(enrollment_id, pitch_page_url, batch_job_id)
+    tracked = tracked_url(enrollment_id, pitch_page_url, batch_job_id, campaign_contact_id)
     cta = _CTA_TEMPLATE.format(url=tracked, label=label)
     return (html_body or "") + cta
 
@@ -184,15 +199,19 @@ def render_with_tracking(
     pitch_page_url: Optional[str] = None,
     pitch_page_label: Optional[str] = None,
     batch_job_id: Optional[int] = None,
+    campaign_contact_id: Optional[int] = None,
 ) -> str:
     """
     Single entry point used by the send paths. Rewrites in-body links first,
     then appends the pitch-page CTA. Order matters: doing it this way means
     the appended CTA is already a tracked URL and doesn't get wrapped twice.
 
-    Send paths pass exactly one attribution id: sequences pass enrollment_id;
-    batch jobs pass batch_job_id. Both end up in email_events on click.
+    Send paths populate the ids that apply:
+      - Sequences pass enrollment_id (contact + batch_job_id are not used —
+        the enrollment row already resolves to a contact at /r time).
+      - Batch sends pass batch_job_id + campaign_contact_id so each per-
+        contact send attributes its click to the right recipient directly.
     """
-    body = rewrite_links_in_body(html_body or "", enrollment_id, batch_job_id)
-    body = append_pitch_page_cta(body, pitch_page_url, pitch_page_label, enrollment_id, batch_job_id)
+    body = rewrite_links_in_body(html_body or "", enrollment_id, batch_job_id, campaign_contact_id)
+    body = append_pitch_page_cta(body, pitch_page_url, pitch_page_label, enrollment_id, batch_job_id, campaign_contact_id)
     return body

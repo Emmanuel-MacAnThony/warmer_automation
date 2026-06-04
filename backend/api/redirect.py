@@ -37,25 +37,26 @@ async def click_redirect(
     u: str = "",
     s: str = "",
     bjid: str = "",
+    cid: str = "",
 ):
     if not eid or not u or not s:
         return PlainTextResponse("bad request", status_code=400)
 
-    # The signature payload uses "0" when no batch attribution is present —
-    # the URL just omits the query param in that case, so normalise here.
+    # The signature payload uses "0" when an id is absent — the URL just
+    # omits the query param in that case, so normalise to "0" for verify.
     bjid_for_sig = bjid or "0"
-    if not verify_signature(eid, u, s, bjid_for_sig):
+    cid_for_sig  = cid  or "0"
+    if not verify_signature(eid, u, s, bjid_for_sig, cid_for_sig):
         # Tampered or forged URL. Don't log to events (it isn't a real click)
         # and don't reveal anything about the destination.
-        logger.warning(f"[/r] signature mismatch eid={eid!r} bjid={bjid!r}")
+        logger.warning(f"[/r] signature mismatch eid={eid!r} bjid={bjid!r} cid={cid!r}")
         return PlainTextResponse("invalid signature", status_code=400)
 
     dest = decode_tracked_url(u)
     if not dest:
         return PlainTextResponse("invalid destination", status_code=400)
 
-    # Resolve enrollment context for the audit row. Each send carries exactly
-    # one attribution id; the other comes back None.
+    # Resolve attribution ids for the audit row.
     enrollment_id: int | None = None
     batch_job_id: int | None = None
     campaign_contact_id: int | None = None
@@ -72,8 +73,17 @@ async def click_redirect(
                 batch_job_id = None
     except ValueError:
         batch_job_id = None
+    try:
+        if cid:
+            campaign_contact_id = int(cid)
+            if campaign_contact_id <= 0:
+                campaign_contact_id = None
+    except ValueError:
+        campaign_contact_id = None
 
-    if enrollment_id is not None:
+    # If only an enrollment_id was carried, recover the contact via lookup so
+    # sequence clicks still feed per-contact engagement queries.
+    if enrollment_id is not None and campaign_contact_id is None:
         try:
             row = await seq_repo.get_enrollment_contact_id(enrollment_id)
             if row is not None:
