@@ -14,8 +14,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
-    # Read message metadata (From headers only) — needed for sequence reply detection.
-    "https://www.googleapis.com/auth/gmail.metadata",
+    # Read message bodies so we can:
+    #   1) Detect replies on sequence threads (we only need 'From' headers,
+    #      gmail.metadata would suffice for that alone)
+    #   2) Parse DSN bounce messages — requires format=raw on messages.get,
+    #      which Gmail explicitly forbids under gmail.metadata. So we ask
+    #      for gmail.readonly (which is a superset of gmail.metadata).
+    "https://www.googleapis.com/auth/gmail.readonly",
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
 ]
