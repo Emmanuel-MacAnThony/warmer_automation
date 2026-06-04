@@ -752,6 +752,10 @@ export const api = {
   getBatchJobBounces: (jobId: number) =>
     request<{ bounces: BatchJobBounce[] }>(`/batch-jobs/${jobId}/bounces`).then(r => r.bounces),
 
+  getBatchJobClicks: (jobId: number) =>
+    // Same row shape as a sequence click — name/email/title/company + counts.
+    request<{ clicks: SequenceClick[] }>(`/batch-jobs/${jobId}/clicks`).then(r => r.clicks),
+
   listAllBatchEmailJobs: (base_id: string, table_id: string) =>
     request<{ jobs: BatchEmailJob[] }>(`/batch-jobs?base_id=${base_id}&table_id=${table_id}`)
       .then(r => r.jobs),

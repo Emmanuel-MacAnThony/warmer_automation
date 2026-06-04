@@ -31,23 +31,33 @@ router = APIRouter(tags=["click-tracking"])
 
 
 @router.get("/r", include_in_schema=False)
-async def click_redirect(request: Request, eid: str = "", u: str = "", s: str = ""):
+async def click_redirect(
+    request: Request,
+    eid: str = "",
+    u: str = "",
+    s: str = "",
+    bjid: str = "",
+):
     if not eid or not u or not s:
         return PlainTextResponse("bad request", status_code=400)
 
-    if not verify_signature(eid, u, s):
+    # The signature payload uses "0" when no batch attribution is present —
+    # the URL just omits the query param in that case, so normalise here.
+    bjid_for_sig = bjid or "0"
+    if not verify_signature(eid, u, s, bjid_for_sig):
         # Tampered or forged URL. Don't log to events (it isn't a real click)
         # and don't reveal anything about the destination.
-        logger.warning(f"[/r] signature mismatch eid={eid!r}")
+        logger.warning(f"[/r] signature mismatch eid={eid!r} bjid={bjid!r}")
         return PlainTextResponse("invalid signature", status_code=400)
 
     dest = decode_tracked_url(u)
     if not dest:
         return PlainTextResponse("invalid destination", status_code=400)
 
-    # Resolve enrollment context for the audit row. Both fields are optional;
-    # we just attach whichever we can find. Failures don't block the redirect.
+    # Resolve enrollment context for the audit row. Each send carries exactly
+    # one attribution id; the other comes back None.
     enrollment_id: int | None = None
+    batch_job_id: int | None = None
     campaign_contact_id: int | None = None
     try:
         enrollment_id = int(eid)
@@ -55,6 +65,13 @@ async def click_redirect(request: Request, eid: str = "", u: str = "", s: str = 
             enrollment_id = None
     except ValueError:
         enrollment_id = None
+    try:
+        if bjid:
+            batch_job_id = int(bjid)
+            if batch_job_id <= 0:
+                batch_job_id = None
+    except ValueError:
+        batch_job_id = None
 
     if enrollment_id is not None:
         try:
@@ -67,7 +84,7 @@ async def click_redirect(request: Request, eid: str = "", u: str = "", s: str = 
     try:
         await engagement_repo.record_click(
             sequence_enrollment_id=enrollment_id,
-            batch_job_id=None,  # not currently propagated through the URL
+            batch_job_id=batch_job_id,
             campaign_contact_id=campaign_contact_id,
             link_url=dest,
             user_agent=request.headers.get("user-agent"),

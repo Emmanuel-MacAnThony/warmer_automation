@@ -581,6 +581,17 @@ async def get_batch_job_detail(job_id: int):
         return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
+@router.get("/batch-jobs/{job_id}/clicks")
+async def get_batch_job_clicks(job_id: int):
+    """Contacts who clicked any link in this batch job — strongest engagement signal."""
+    try:
+        from backend.infra.db import engagement_repo
+        return {"clicks": await engagement_repo.list_click_contacts_for_batch_job(job_id)}
+    except Exception as e:
+        logger.error(f"Failed to fetch clicks for batch job {job_id}: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})
+
+
 @router.get("/batch-jobs/{job_id}/bounces")
 async def get_batch_job_bounces(job_id: int, limit: int = 200):
     """Bounces detected against contacts in this batch job — joined with contact

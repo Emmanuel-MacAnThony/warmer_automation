@@ -74,6 +74,79 @@ async def count_unique_clickers_for_sequence(sequence_id: int) -> int:
     return int(row["n"]) if row else 0
 
 
+async def count_clicks_for_batch_job(batch_job_id: int) -> int:
+    """Total click events recorded against any send in this batch job."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COUNT(*) AS n FROM email_events WHERE batch_job_id=$1 AND event_type='click'",
+            batch_job_id,
+        )
+    return int(row["n"]) if row else 0
+
+
+async def count_unique_clickers_for_batch_job(batch_job_id: int) -> int:
+    """Distinct contacts who clicked anything in this batch — falls back to
+    counting distinct (link_url, ip) pairs when campaign_contact_id is NULL
+    (the early batch path before per-contact attribution lands)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT COUNT(DISTINCT COALESCE(
+                       campaign_contact_id::text,
+                       link_url || COALESCE(ip, '')
+                   )) AS n
+            FROM email_events
+            WHERE batch_job_id=$1 AND event_type='click'
+            """,
+            batch_job_id,
+        )
+    return int(row["n"]) if row else 0
+
+
+async def list_click_contacts_for_batch_job(batch_job_id: int, limit: int = 200) -> list[dict[str, Any]]:
+    """
+    Contacts who clicked something in this batch job — grouped by contact when
+    we have one, falling back to per-event rows when campaign_contact_id wasn't
+    resolved at click time (older clicks before batch attribution was wired).
+    Ordered by most recent click.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT cc.contact_snapshot,
+                   COUNT(*)                 AS click_count,
+                   MAX(ev.occurred_at)      AS last_click_at,
+                   (ARRAY_AGG(ev.link_url ORDER BY ev.occurred_at DESC))[1] AS last_link_url
+            FROM email_events ev
+            LEFT JOIN campaign_contacts cc ON cc.id = ev.campaign_contact_id
+            WHERE ev.batch_job_id = $1 AND ev.event_type = 'click'
+            GROUP BY cc.id, cc.contact_snapshot
+            ORDER BY last_click_at DESC
+            LIMIT $2
+            """,
+            batch_job_id, limit,
+        )
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        snap = r["contact_snapshot"]
+        if isinstance(snap, str):
+            snap = json.loads(snap)
+        snap = snap or {}
+        out.append({
+            "name":          snap.get("name") or "Unknown",
+            "email":         snap.get("email") or "",
+            "title":         snap.get("title") or "",
+            "company":       snap.get("company") or "",
+            "click_count":   int(r["click_count"]),
+            "last_link_url": r["last_link_url"],
+            "last_click_at": r["last_click_at"].isoformat() if r["last_click_at"] else None,
+        })
+    return out
+
+
 async def list_click_contacts_for_sequence(sequence_id: int, limit: int = 200) -> list[dict[str, Any]]:
     """
     Contacts who clicked something in this sequence — with their LAST click's

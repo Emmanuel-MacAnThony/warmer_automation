@@ -304,15 +304,14 @@ async def run(job_id: int) -> None:
                         continue
 
                 # Rewrite in-body links + append pitch-page CTA. Batch sends
-                # have no enrollment_id, so clicks log without per-enrollment
-                # attribution (per-contact attribution is recovered at /r time
-                # when a sequence is involved — batch attribution is a known
-                # follow-up if it matters for analytics).
+                # carry batch_job_id (instead of enrollment_id) so each click
+                # attributes to this job in email_events.
                 body_html = render_with_tracking(
                     resolved["rendered_body"],
                     enrollment_id=None,
                     pitch_page_url=pitch_page_url,
                     pitch_page_label=pitch_page_label,
+                    batch_job_id=job_id,
                 )
 
                 outbound = OutboundEmail(

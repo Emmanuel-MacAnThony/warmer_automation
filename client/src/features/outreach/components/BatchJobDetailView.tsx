@@ -1,5 +1,12 @@
-import { api, type BatchJobBounce, type BatchJobDetail } from "@/shared/api/client";
+import { api, type BatchJobBounce, type BatchJobDetail, type CampaignTemplate, type SequenceClick } from "@/shared/api/client";
 import { Card } from "@/shared/components/ui/card";
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from "@/shared/components/ui/sheet";
 import { cn } from "@/shared/lib/utils";
 import { motion } from "framer-motion";
 import {
@@ -8,10 +15,11 @@ import {
     FileText,
     Link2,
     Loader2,
+    MousePointerClick,
     XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "@/shared/lib/toast";
 import { EMAIL_JOB_STATUS, TIER_META } from "@/features/jobs/utils";
 
@@ -30,6 +38,11 @@ export function BatchJobDetailView() {
     const [job, setJob] = useState<BatchJobDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [bounces, setBounces] = useState<BatchJobBounce[] | null>(null);
+    const [clicks, setClicks] = useState<SequenceClick[] | null>(null);
+    // Slide-in template drawer — fetched on first open, cached afterwards.
+    const [templateOpen, setTemplateOpen] = useState(false);
+    const [template, setTemplate] = useState<CampaignTemplate | null>(null);
+    const [loadingTemplate, setLoadingTemplate] = useState(false);
 
     const load = async () => {
         if (Number.isNaN(jobId)) return;
@@ -54,15 +67,30 @@ export function BatchJobDetailView() {
         if (!job) return;
         let cancelled = false;
         (async () => {
-            try {
-                const b = await api.getBatchJobBounces(job.id);
-                if (!cancelled) setBounces(b);
-            } catch {
-                if (!cancelled) setBounces([]);
-            }
+            const [b, c] = await Promise.all([
+                api.getBatchJobBounces(job.id).catch(() => []),
+                api.getBatchJobClicks(job.id).catch(() => []),
+            ]);
+            if (cancelled) return;
+            setBounces(b);
+            setClicks(c);
         })();
         return () => { cancelled = true; };
     }, [job?.id]);
+
+    const openTemplate = async () => {
+        setTemplateOpen(true);
+        if (template !== null || !job) return;
+        setLoadingTemplate(true);
+        try {
+            const t = await api.getTemplateById(job.campaign_id, job.template_id);
+            setTemplate(t);
+        } catch (e: any) {
+            toast.error(e?.message ?? "Failed to load template");
+        } finally {
+            setLoadingTemplate(false);
+        }
+    };
 
     if (Number.isNaN(jobId)) return <NotFound onBack={() => navigate("/outreach?tab=jobs")} />;
     if (loading && !job) {
@@ -79,6 +107,7 @@ export function BatchJobDetailView() {
     const remaining = Math.max(0, job.total - job.sent - job.failed);
     const pct       = job.total > 0 ? Math.min(100, Math.round((job.sent / job.total) * 100)) : 0;
     const bouncedCount = bounces?.length ?? 0;
+    const clickedCount = clicks?.length ?? 0;
 
     // High-bounce warning, parallel to the sequence card: 5% over a 5-contact floor.
     const bounceRate = job.sent >= 5 && bouncedCount > 0 ? (bouncedCount / job.sent) : 0;
@@ -87,6 +116,7 @@ export function BatchJobDetailView() {
     const metrics = [
         { label: "Total",     value: job.total,    color: "text-foreground/75" },
         { label: "Sent",      value: job.sent,     color: "text-primary/85" },
+        { label: "Clicked",   value: clickedCount, color: clickedCount > 0 ? "text-primary" : "text-muted-foreground/50" },
         { label: "Failed",    value: job.failed,   color: job.failed > 0 ? "text-amber-500/80" : "text-muted-foreground/50" },
         { label: "Bounced",   value: bouncedCount, color: bouncedCount > 0 ? "text-red-500/75" : "text-muted-foreground/50" },
         { label: "Remaining", value: remaining,    color: "text-muted-foreground/60" },
@@ -143,7 +173,7 @@ export function BatchJobDetailView() {
                         />
                     </div>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-border/40 border-t border-border/40">
+                <div className="grid grid-cols-2 sm:grid-cols-6 divide-x divide-y sm:divide-y-0 divide-border/40 border-t border-border/40">
                     {metrics.map((m) => (
                         <div key={m.label} className="flex flex-col items-center justify-center px-3 py-4">
                             <p className={cn("text-lg font-semibold tabular-nums leading-none", m.color)}>
@@ -197,14 +227,42 @@ export function BatchJobDetailView() {
                 </Section>
             )}
 
-            {/* Template */}
+            {/* Template — slides in from the right instead of navigating away */}
             <Section icon={FileText} title="Template">
-                <Link
-                    to={`/outreach?campaign_id=${job.campaign_id}&tier=${job.tier}`}
+                <button
+                    onClick={openTemplate}
                     className="inline-flex items-center gap-1.5 text-[12px] font-mono text-muted-foreground hover:text-primary transition-colors"
                 >
                     Template #{job.template_id} →
-                </Link>
+                </button>
+            </Section>
+
+            {/* Clicked — strongest engagement signal */}
+            <Section icon={MousePointerClick} title={`Clicked (${clickedCount})`} accent="primary">
+                {clicks === null ? (
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 size={11} className="animate-spin" /> Loading…</div>
+                ) : clicks.length === 0 ? (
+                    <p className="text-[12px] text-muted-foreground/55 leading-relaxed">
+                        No clicks recorded yet. Add a Pitch Page to your campaign to give every email a tracked CTA.
+                    </p>
+                ) : (
+                    <div className="space-y-1.5">
+                        {clicks.map((c, i) => (
+                            <div key={i} className="flex items-center gap-2 text-[12px]">
+                                <span className="text-foreground/85 truncate">{c.name}</span>
+                                {c.click_count > 1 && (
+                                    <span className="font-mono text-[10px] text-primary/70" title={`Clicked ${c.click_count} times`}>×{c.click_count}</span>
+                                )}
+                                {(c.title || c.company) && (
+                                    <span className="text-muted-foreground/40 truncate hidden sm:inline">{[c.title, c.company].filter(Boolean).join(" · ")}</span>
+                                )}
+                                {c.email && (
+                                    <span className="ml-auto font-mono text-muted-foreground/50 truncate shrink-0">{c.email}</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </Section>
 
             {/* Bounced */}
@@ -236,6 +294,55 @@ export function BatchJobDetailView() {
                     </div>
                 )}
             </Section>
+
+            {/* Template slide-in drawer */}
+            <Sheet open={templateOpen} onOpenChange={setTemplateOpen}>
+                <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col">
+                    <SheetHeader>
+                        <SheetTitle className="font-mono">Template #{job.template_id}</SheetTitle>
+                        <SheetDescription>
+                            {tier.label} · campaign {job.campaign_id}
+                        </SheetDescription>
+                    </SheetHeader>
+                    <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-5">
+                        {loadingTemplate ? (
+                            <div className="flex items-center gap-2 text-[12px] text-muted-foreground py-12 justify-center">
+                                <Loader2 size={13} className="animate-spin" /> Loading template…
+                            </div>
+                        ) : !template ? (
+                            <p className="text-[12px] text-muted-foreground/55 py-8 text-center">
+                                Template not found.
+                            </p>
+                        ) : (
+                            <>
+                                <div className="space-y-1">
+                                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/45">Subject</p>
+                                    <p className="text-[13px] font-medium text-foreground/90">{template.subject || "(no subject)"}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/45">Body</p>
+                                    <div
+                                        className="text-[13px] leading-relaxed text-foreground/80 whitespace-pre-wrap font-sans break-words"
+                                        dangerouslySetInnerHTML={{ __html: template.body || "<em class='text-muted-foreground/40'>(empty)</em>" }}
+                                    />
+                                </div>
+                                {job.pitch_page_url && (
+                                    <div className="space-y-1 pt-3 border-t border-border/40">
+                                        <p className="text-[9px] font-mono uppercase tracking-widest text-primary/60">Auto-appended CTA</p>
+                                        <p className="text-[12px] text-muted-foreground/75">
+                                            Every send for this campaign gets a tracked button added at the end of the body:
+                                        </p>
+                                        <p className="text-[12px] font-mono">
+                                            <span className="text-foreground/85">{job.pitch_page_label || "Learn more"}</span>
+                                            <span className="text-muted-foreground/55"> → {job.pitch_page_url}</span>
+                                        </p>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }
