@@ -5,6 +5,7 @@ import { CreateCampaignView } from "./components/CreateCampaignView";
 import { NoTableSelected } from "./components/NoTableSelected";
 import { QueueView } from "./components/QueueView";
 import { SegmentingView } from "./components/SegmentingView";
+import { BatchJobDetailView } from "./components/BatchJobDetailView";
 import { SequenceDetailView } from "./components/SequenceDetailView";
 import { SuppressionsView } from "./components/SuppressionsView";
 import { OutreachContext } from "./context/OutreachContext";
@@ -32,6 +33,7 @@ export function Outreach() {
                 <Route index element={<CampaignListView />} />
                 <Route path="creating" element={<CreateCampaignView />} />
                 <Route path="sequences/:id" element={<SequenceDetailView />} />
+                <Route path="batch-jobs/:id" element={<BatchJobDetailView />} />
                 <Route path="suppressions" element={
                     <div className="p-6 max-w-4xl mx-auto space-y-5">
                         <button

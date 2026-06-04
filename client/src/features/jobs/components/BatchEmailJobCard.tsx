@@ -3,7 +3,7 @@ import { Card } from "@/shared/components/ui/card";
 import { cn } from "@/shared/lib/utils";
 import { motion } from "framer-motion";
 import { ChevronRight, FileText, Loader2, Trash2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { EMAIL_JOB_STATUS, TIER_META } from "../utils";
 
 export interface BatchEmailJobCardProps {
@@ -14,11 +14,15 @@ export interface BatchEmailJobCardProps {
 }
 
 export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: BatchEmailJobCardProps) {
+    const navigate  = useNavigate();
     const tier      = TIER_META[job.tier]          ?? TIER_META.tier_1;
     const status    = EMAIL_JOB_STATUS[job.status] ?? EMAIL_JOB_STATUS.pending;
     const remaining = Math.max(0, job.total - job.sent - job.failed);
     const pct       = job.total > 0 ? Math.min(100, Math.round((job.sent / job.total) * 100)) : 0;
     const isActive  = job.status === "pending" || job.status === "running";
+
+    const goToDetail = () => navigate(`/outreach/batch-jobs/${job.id}`);
+    const stopAndDo = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
 
     const stats = [
         { label: "Total",     value: job.total,   color: "text-foreground/70"  },
@@ -34,7 +38,10 @@ export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: 
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.2 }}
         >
-            <Card className="overflow-hidden w-full rounded-md border-border/70">
+            <Card
+                className="overflow-hidden w-full rounded-md cursor-pointer hover:border-white/15 transition-colors"
+                onClick={goToDetail}
+            >
 
                 {/* Header */}
                 <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/50">
@@ -47,7 +54,7 @@ export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: 
                         {new Date(job.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </span>
                     <button
-                        onClick={() => onDelete(job)}
+                        onClick={stopAndDo(() => onDelete(job))}
                         disabled={deleting}
                         className="p-1 rounded transition-colors shrink-0 hover:bg-red-500/10 hover:text-red-400 text-muted-foreground/30 cursor-pointer"
                     >
@@ -97,7 +104,7 @@ export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: 
                 <div className="px-4 py-2 border-t border-border/40">
                     {onTemplateClick ? (
                         <button
-                            onClick={() => onTemplateClick(job)}
+                            onClick={stopAndDo(() => onTemplateClick(job))}
                             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-primary transition-colors group"
                         >
                             <FileText size={10} className="group-hover:text-primary/60 transition-colors shrink-0" />
@@ -107,6 +114,7 @@ export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: 
                     ) : (
                         <Link
                             to={`/outreach?campaign_id=${job.campaign_id}&tier=${job.tier}`}
+                            onClick={(e) => e.stopPropagation()}
                             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-primary transition-colors group"
                         >
                             <FileText size={10} className="group-hover:text-primary/60 transition-colors shrink-0" />

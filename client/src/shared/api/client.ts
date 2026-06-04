@@ -365,6 +365,24 @@ export interface BatchEmailJob extends Omit<BatchSendJob, never> {
   campaign_goal: string
 }
 
+// Single-job lookup returns the same fields PLUS the campaign's pitch_page
+// info (joined server-side so the detail page doesn't need a second call).
+export interface BatchJobDetail extends BatchEmailJob {
+  pitch_page_url: string | null
+  pitch_page_label: string | null
+}
+
+export interface BatchJobBounce {
+  name: string
+  email: string
+  title: string
+  company: string
+  reason: string | null
+  smtp_status: string | null
+  hard: boolean | null
+  detected_at: string | null
+}
+
 export interface BatchSendJob {
   id: number
   campaign_id: number
@@ -727,6 +745,12 @@ export const api = {
 
   deleteBatchSendJob: (campaignId: number, jobId: number) =>
     request<{ success: boolean }>(`/campaigns/${campaignId}/batch-jobs/${jobId}`, { method: 'DELETE' }),
+
+  getBatchJob: (jobId: number) =>
+    request<BatchJobDetail>(`/batch-jobs/${jobId}`),
+
+  getBatchJobBounces: (jobId: number) =>
+    request<{ bounces: BatchJobBounce[] }>(`/batch-jobs/${jobId}/bounces`).then(r => r.bounces),
 
   listAllBatchEmailJobs: (base_id: string, table_id: string) =>
     request<{ jobs: BatchEmailJob[] }>(`/batch-jobs?base_id=${base_id}&table_id=${table_id}`)

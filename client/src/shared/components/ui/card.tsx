@@ -12,7 +12,10 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-lg bg-card py-4 text-sm text-card-foreground border border-border/60 shadow-sm has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-lg *:[img:last-child]:rounded-b-lg",
+        // Reference-style translucent panel: 50% card colour over the canvas
+        // with a hairline white border and a touch of backdrop blur. The dark
+        // canvas showing through is what gives that subtle warm fade.
+        "group/card flex flex-col gap-4 overflow-hidden rounded-lg bg-card/50 backdrop-blur-sm py-4 text-sm text-card-foreground border border-white/[0.08] shadow-sm has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-lg *:[img:last-child]:rounded-b-lg",
         className
       )}
       {...props}

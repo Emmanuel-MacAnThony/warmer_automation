@@ -91,37 +91,38 @@
   --chart-5: #EF4444;
 }
 
-/* ─── Dark mode — Starlink-inspired ────────────────────── */
-/* Primary is a soft teal (rather than vivid emerald) so CTAs blend with the
-   dark surface instead of shouting. The semantic teal-* classes used for
-   "replied / success / online" status stay as-is — they're meaningfully
-   different (a positive result, not a primary action). */
+/* ─── Dark mode ────────────────────────────────────────── */
+/* Neutral / very-slightly-warm canvas (canvas + panel) borrowed from the
+   reference job-queue UI — the dark canvas showing through 50%-opacity
+   panels gives that subtle "brown fade" feel. Saturated brand blue was
+   replaced with this more neutral foundation so cards layer cleanly.
+   Primary stays soft teal so CTAs blend instead of shouting. */
 .dark {
-  --background: #060C18;
-  --foreground: #E2E8F0;
-  --card: #0C1428;
-  --card-foreground: #E2E8F0;
-  --popover: #0F1A30;
-  --popover-foreground: #E2E8F0;
+  --background: #0A0B0D;            /* canvas — very dark neutral, faintest cool cast */
+  --foreground: #E6ECE9;            /* ink — warm off-white */
+  --card: #11140F;                  /* panel — slight green-brown undertone */
+  --card-foreground: #E6ECE9;
+  --popover: #13160F;
+  --popover-foreground: #E6ECE9;
   --primary: #5EEAD4;
   --primary-foreground: #04121A;
-  --secondary: #111E35;
-  --secondary-foreground: #94A3B8;
-  --muted: #111E35;
-  --muted-foreground: #64748B;
+  --secondary: #14171A;
+  --secondary-foreground: #B8C2BD;
+  --muted: #14171A;
+  --muted-foreground: #7D8A85;      /* muted — warmer than slate */
   --accent: #0F2A2A;
   --accent-foreground: #99F6E4;
   --destructive: #EF4444;
-  --border: #1C2A40;
-  --input: #1C2A40;
+  --border: #1A1D1F;                /* faint cool gray for fallbacks; cards use white/[0.08] directly */
+  --input: #1A1D1F;
   --ring: #5EEAD4;
-  --sidebar: #080E1E;
-  --sidebar-foreground: #E2E8F0;
+  --sidebar: #08090B;
+  --sidebar-foreground: #E6ECE9;
   --sidebar-primary: #5EEAD4;
   --sidebar-primary-foreground: #04121A;
-  --sidebar-accent: #111E35;
-  --sidebar-accent-foreground: #94A3B8;
-  --sidebar-border: #1C2A40;
+  --sidebar-accent: #14171A;
+  --sidebar-accent-foreground: #B8C2BD;
+  --sidebar-border: #1A1D1F;
   --sidebar-ring: #5EEAD4;
   --chart-1: #5EEAD4;
   --chart-2: #10B981;

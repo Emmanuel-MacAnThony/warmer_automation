@@ -1,0 +1,278 @@
+import { api, type BatchJobBounce, type BatchJobDetail } from "@/shared/api/client";
+import { Card } from "@/shared/components/ui/card";
+import { cn } from "@/shared/lib/utils";
+import { motion } from "framer-motion";
+import {
+    AlertTriangle,
+    ArrowLeft,
+    FileText,
+    Link2,
+    Loader2,
+    XCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "@/shared/lib/toast";
+import { EMAIL_JOB_STATUS, TIER_META } from "@/features/jobs/utils";
+
+function fmtAbs(iso?: string | null): string {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString(undefined, {
+        weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
+    });
+}
+
+export function BatchJobDetailView() {
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const jobId = id ? parseInt(id, 10) : NaN;
+
+    const [job, setJob] = useState<BatchJobDetail | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [bounces, setBounces] = useState<BatchJobBounce[] | null>(null);
+
+    const load = async () => {
+        if (Number.isNaN(jobId)) return;
+        try {
+            const fresh = await api.getBatchJob(jobId);
+            setJob(fresh);
+        } catch (e: any) {
+            toast.error(e?.message ?? "Failed to load batch job");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        load();
+        const t = setInterval(load, 5000);
+        return () => clearInterval(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [jobId]);
+
+    useEffect(() => {
+        if (!job) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const b = await api.getBatchJobBounces(job.id);
+                if (!cancelled) setBounces(b);
+            } catch {
+                if (!cancelled) setBounces([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [job?.id]);
+
+    if (Number.isNaN(jobId)) return <NotFound onBack={() => navigate("/outreach?tab=jobs")} />;
+    if (loading && !job) {
+        return (
+            <div className="flex items-center justify-center py-24 text-[12px] text-muted-foreground gap-2">
+                <Loader2 size={13} className="animate-spin" /> Loading batch job…
+            </div>
+        );
+    }
+    if (!job) return <NotFound onBack={() => navigate("/outreach?tab=jobs")} />;
+
+    const tier      = TIER_META[job.tier]          ?? TIER_META.tier_1;
+    const status    = EMAIL_JOB_STATUS[job.status] ?? EMAIL_JOB_STATUS.pending;
+    const remaining = Math.max(0, job.total - job.sent - job.failed);
+    const pct       = job.total > 0 ? Math.min(100, Math.round((job.sent / job.total) * 100)) : 0;
+    const bouncedCount = bounces?.length ?? 0;
+
+    // High-bounce warning, parallel to the sequence card: 5% over a 5-contact floor.
+    const bounceRate = job.sent >= 5 && bouncedCount > 0 ? (bouncedCount / job.sent) : 0;
+    const showBounceWarning = bounceRate >= 0.05;
+
+    const metrics = [
+        { label: "Total",     value: job.total,    color: "text-foreground/75" },
+        { label: "Sent",      value: job.sent,     color: "text-primary/85" },
+        { label: "Failed",    value: job.failed,   color: job.failed > 0 ? "text-amber-500/80" : "text-muted-foreground/50" },
+        { label: "Bounced",   value: bouncedCount, color: bouncedCount > 0 ? "text-red-500/75" : "text-muted-foreground/50" },
+        { label: "Remaining", value: remaining,    color: "text-muted-foreground/60" },
+    ];
+
+    return (
+        <div className="p-6 max-w-4xl mx-auto space-y-5">
+            <button
+                onClick={() => navigate("/outreach?tab=jobs")}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+                <ArrowLeft size={12} /> Back to jobs
+            </button>
+
+            {/* Header */}
+            <div className="space-y-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                    <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-mono text-[11px] font-medium shrink-0", tier.badge)}>
+                        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", tier.dot)} />
+                        {tier.label}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-mono ml-auto">
+                        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", status.dot)} />
+                        <span className={cn(status.text)}>{status.label}</span>
+                    </span>
+                </div>
+                <h1 className="text-xl font-mono font-bold tracking-tight truncate">
+                    {job.campaign_goal}
+                </h1>
+                <div className="flex items-center gap-4 text-[11px] font-mono text-muted-foreground/55 flex-wrap">
+                    <span>Created {fmtAbs(job.created_at)}</span>
+                    {job.started_at && <span>Started {fmtAbs(job.started_at)}</span>}
+                    {job.completed_at && <span>Completed {fmtAbs(job.completed_at)}</span>}
+                </div>
+            </div>
+
+            {/* Progress bar */}
+            <Card className="overflow-hidden">
+                <div className="px-4 py-4 space-y-2.5">
+                    <div className="flex items-baseline gap-3 text-sm">
+                        <span className="font-semibold tabular-nums text-foreground">
+                            {job.sent.toLocaleString()}
+                            {job.total > 0 && (
+                                <span className="text-muted-foreground/70">/{job.total.toLocaleString()} ({pct}%)</span>
+                            )}
+                        </span>
+                        <span className="text-muted-foreground/60 text-[11px] font-mono uppercase tracking-widest">sent</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted/30 overflow-hidden">
+                        <motion.div
+                            className="h-full bg-primary/70 rounded-full"
+                            animate={{ width: `${pct}%` }}
+                            transition={{ duration: 0.6, ease: "easeOut" }}
+                        />
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-border/40 border-t border-border/40">
+                    {metrics.map((m) => (
+                        <div key={m.label} className="flex flex-col items-center justify-center px-3 py-4">
+                            <p className={cn("text-lg font-semibold tabular-nums leading-none", m.color)}>
+                                {m.value.toLocaleString()}
+                            </p>
+                            <p className="font-mono text-[9px] text-muted-foreground/45 tracking-widest uppercase mt-1.5">
+                                {m.label}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+            </Card>
+
+            {/* Retry banner */}
+            {job.retry_after && (
+                <div className="flex items-start gap-2 px-4 py-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[12px] text-amber-300/90">
+                    <AlertTriangle size={13} className="shrink-0 mt-0.5 text-amber-400" />
+                    <span>Rate limited — will resume after <span className="font-medium">{fmtAbs(job.retry_after)}</span>.</span>
+                </div>
+            )}
+
+            {/* High bounce rate warning */}
+            {showBounceWarning && (
+                <div className="flex items-start gap-2 px-4 py-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[12px] text-amber-300/90">
+                    <AlertTriangle size={13} className="shrink-0 mt-0.5 text-amber-400" />
+                    <span>
+                        <span className="font-medium">High bounce rate ({Math.round(bounceRate * 100)}%)</span> — domain reputation may be affected. Consider cleaning the list before more sends.
+                    </span>
+                </div>
+            )}
+
+            {/* Error banner */}
+            {job.error && (
+                <div className="flex items-start gap-2 px-4 py-2.5 rounded-lg border border-red-500/20 bg-red-500/5 text-[12px] text-red-300/90">
+                    <XCircle size={13} className="shrink-0 mt-0.5 text-red-400" />
+                    <span>{job.error}</span>
+                </div>
+            )}
+
+            {/* Pitch page (if set on the campaign) */}
+            {job.pitch_page_url && (
+                <Section icon={Link2} title="Pitch page (tracked CTA on every email)">
+                    <a
+                        href={job.pitch_page_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[12px] font-mono text-primary/85 hover:text-primary truncate"
+                    >
+                        {job.pitch_page_label || "Learn more"} → <span className="text-primary/55 truncate">{job.pitch_page_url}</span>
+                    </a>
+                </Section>
+            )}
+
+            {/* Template */}
+            <Section icon={FileText} title="Template">
+                <Link
+                    to={`/outreach?campaign_id=${job.campaign_id}&tier=${job.tier}`}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-mono text-muted-foreground hover:text-primary transition-colors"
+                >
+                    Template #{job.template_id} →
+                </Link>
+            </Section>
+
+            {/* Bounced */}
+            <Section icon={XCircle} title={`Bounced (${bouncedCount})`} accent="red">
+                {bounces === null ? (
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 size={11} className="animate-spin" /> Loading…</div>
+                ) : bounces.length === 0 ? (
+                    <p className="text-[12px] text-muted-foreground/55 leading-relaxed">No bounces from this job.</p>
+                ) : (
+                    <div className="space-y-1.5">
+                        {bounces.map((b, i) => (
+                            <div key={i} className="flex items-center gap-2 text-[12px]">
+                                <span className="text-foreground/85 truncate">{b.name}</span>
+                                {b.smtp_status && (
+                                    <span className="font-mono text-[10px] text-red-400/70 shrink-0" title={b.reason ?? undefined}>
+                                        {b.smtp_status}{b.hard === false ? " (soft)" : ""}
+                                    </span>
+                                )}
+                                {(b.title || b.company) && (
+                                    <span className="text-muted-foreground/40 truncate hidden sm:inline">
+                                        {[b.title, b.company].filter(Boolean).join(" · ")}
+                                    </span>
+                                )}
+                                {b.email && (
+                                    <span className="ml-auto font-mono text-muted-foreground/50 truncate shrink-0">{b.email}</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </Section>
+        </div>
+    );
+}
+
+// ── Sub-components ──────────────────────────────────────────────────────────
+
+function Section({ icon: Icon, title, accent, children }: {
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    title: string;
+    accent?: "primary" | "teal" | "red";
+    children: React.ReactNode;
+}) {
+    const accentClass =
+        accent === "primary" ? "text-primary/80" :
+        accent === "teal" ? "text-teal-300/80" :
+        accent === "red" ? "text-red-400/80" :
+        "text-muted-foreground/70";
+    return (
+        <Card className="overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40">
+                <Icon size={13} className={accentClass} />
+                <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground/70">{title}</h2>
+            </div>
+            <div className="px-4 py-3">{children}</div>
+        </Card>
+    );
+}
+
+function NotFound({ onBack }: { onBack: () => void }) {
+    return (
+        <div className="p-6 max-w-4xl mx-auto space-y-4">
+            <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                <ArrowLeft size={12} /> Back
+            </button>
+            <Card className="py-16 px-8 text-center text-[13px] text-muted-foreground">
+                Batch job not found.
+            </Card>
+        </div>
+    );
+}

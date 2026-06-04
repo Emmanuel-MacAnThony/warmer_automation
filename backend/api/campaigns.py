@@ -561,6 +561,74 @@ async def list_all_batch_jobs(base_id: str, table_id: str):
         return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
+@router.get("/batch-jobs/{job_id}")
+async def get_batch_job_detail(job_id: int):
+    """Single batch job — used by the batch-job detail page. Joins the campaign goal
+    + pitch page so the detail view doesn't need a second roundtrip."""
+    try:
+        from backend.infra.db.campaign_repo import get_batch_send_job, get_campaign
+        job = await get_batch_send_job(job_id)
+        if not job:
+            return JSONResponse(status_code=404, content={"error": "Batch job not found"})
+        camp = await get_campaign(job["campaign_id"])
+        if camp:
+            job["campaign_goal"] = camp.get("goal")
+            job["pitch_page_url"] = camp.get("pitch_page_url")
+            job["pitch_page_label"] = camp.get("pitch_page_label")
+        return job
+    except Exception as e:
+        logger.error(f"Failed to get batch job {job_id}: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})
+
+
+@router.get("/batch-jobs/{job_id}/bounces")
+async def get_batch_job_bounces(job_id: int, limit: int = 200):
+    """Bounces detected against contacts in this batch job — joined with contact
+    snapshot so the UI can show who bounced + why."""
+    try:
+        from backend.infra.db.client import get_pool
+        import json as _json
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT cc.contact_snapshot,
+                       eb.reason       AS bounce_reason,
+                       eb.smtp_status  AS bounce_status,
+                       eb.detected_at  AS bounce_detected_at,
+                       eb.hard         AS bounce_hard,
+                       eb.email        AS bounce_email
+                FROM email_bounces eb
+                LEFT JOIN campaign_contacts cc
+                       ON LOWER(cc.contact_snapshot->>'email') = eb.email
+                WHERE eb.batch_job_id = $1
+                ORDER BY eb.detected_at DESC
+                LIMIT $2
+                """,
+                job_id, limit,
+            )
+        out = []
+        for r in rows:
+            snap = r["contact_snapshot"]
+            if isinstance(snap, str):
+                snap = _json.loads(snap)
+            snap = snap or {}
+            out.append({
+                "name":         snap.get("name") or "Unknown",
+                "email":        snap.get("email") or r["bounce_email"] or "",
+                "title":        snap.get("title") or "",
+                "company":      snap.get("company") or "",
+                "reason":       r["bounce_reason"],
+                "smtp_status":  r["bounce_status"],
+                "hard":         r["bounce_hard"],
+                "detected_at":  r["bounce_detected_at"].isoformat() if r["bounce_detected_at"] else None,
+            })
+        return {"bounces": out}
+    except Exception as e:
+        logger.error(f"Failed to fetch bounces for batch job {job_id}: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})
+
+
 @router.get("/campaigns/{campaign_id}/batch-jobs")
 async def list_batch_jobs(campaign_id: int, tier: Optional[str] = None):
     try:
