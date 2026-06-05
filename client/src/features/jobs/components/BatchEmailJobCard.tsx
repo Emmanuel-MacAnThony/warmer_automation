@@ -2,7 +2,8 @@ import type { BatchEmailJob } from "@/shared/api/client";
 import { Card } from "@/shared/components/ui/card";
 import { cn } from "@/shared/lib/utils";
 import { motion } from "framer-motion";
-import { ChevronRight, FileText, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, ChevronRight, FileText, Loader2, Trash2, X } from "lucide-react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { EMAIL_JOB_STATUS, TIER_META } from "../utils";
 
@@ -13,6 +14,17 @@ export interface BatchEmailJobCardProps {
     onTemplateClick?: (job: BatchEmailJob) => void;
 }
 
+// "Tomorrow morning" if retry_after is today; the actual time otherwise.
+function fmtRetry(iso: string): string {
+    const d = new Date(iso);
+    const today = new Date();
+    const sameDay = d.toDateString() === today.toDateString();
+    return d.toLocaleString(undefined, {
+        ...(sameDay ? {} : { weekday: "short", day: "numeric", month: "short" }),
+        hour: "numeric", minute: "2-digit",
+    });
+}
+
 export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: BatchEmailJobCardProps) {
     const navigate  = useNavigate();
     const tier      = TIER_META[job.tier]          ?? TIER_META.tier_1;
@@ -20,6 +32,11 @@ export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: 
     const remaining = Math.max(0, job.total - job.sent - job.failed);
     const pct       = job.total > 0 ? Math.min(100, Math.round((job.sent / job.total) * 100)) : 0;
     const isActive  = job.status === "pending" || job.status === "running";
+    // Rate-limit pause is inferred from (status=paused AND retry_after set) —
+    // there's no dedicated pause_reason column on batch_send_jobs (yet).
+    const rateLimited = job.status === "paused" && !!job.retry_after;
+
+    const [pauseBannerDismissed, setPauseBannerDismissed] = useState(false);
 
     const goToDetail = () => navigate(`/outreach/batch-jobs/${job.id}`);
     const stopAndDo = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
@@ -61,6 +78,24 @@ export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: 
                         {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                     </button>
                 </div>
+
+                {/* Rate-limit banner — only on a paused job with a retry_after
+                    timestamp. Mirrors the enrichment job card pattern so the
+                    user knows when Gmail's quota frees up and they can resume. */}
+                {rateLimited && !pauseBannerDismissed && (
+                    <div className="flex items-start gap-3 px-4 py-2.5 border-b border-amber-500/20 bg-amber-500/5">
+                        <AlertTriangle size={13} className="text-amber-400 shrink-0 mt-0.5" />
+                        <p className="flex-1 text-[11px] font-mono text-amber-300/85 leading-relaxed">
+                            Auto-paused — Gmail hit its daily send quota. Resume manually after <span className="font-semibold text-amber-200">{fmtRetry(job.retry_after!)}</span>.
+                        </p>
+                        <button
+                            onClick={stopAndDo(() => setPauseBannerDismissed(true))}
+                            className="text-amber-400/40 hover:text-amber-400 transition-colors shrink-0"
+                        >
+                            <X size={12} />
+                        </button>
+                    </div>
+                )}
 
                 {/* Progress + stats */}
                 <div className="px-4 pt-4 pb-3">

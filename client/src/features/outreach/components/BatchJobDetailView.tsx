@@ -188,11 +188,14 @@ export function BatchJobDetailView() {
                 </div>
             </Card>
 
-            {/* Retry banner */}
-            {job.retry_after && (
+            {/* Rate-limit banner — paused jobs need a manual resume after the quota window */}
+            {job.status === "paused" && job.retry_after && (
                 <div className="flex items-start gap-2 px-4 py-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[12px] text-amber-300/90">
                     <AlertTriangle size={13} className="shrink-0 mt-0.5 text-amber-400" />
-                    <span>Rate limited — will resume after <span className="font-medium">{fmtAbs(job.retry_after)}</span>.</span>
+                    <span>
+                        <span className="font-semibold">Auto-paused — Gmail hit its daily send quota.</span>{" "}
+                        Resume manually after <span className="font-medium text-amber-200">{fmtAbs(job.retry_after)}</span>.
+                    </span>
                 </div>
             )}
 
@@ -321,7 +324,7 @@ export function BatchJobDetailView() {
                                 <div className="space-y-1">
                                     <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/45">Body</p>
                                     <div
-                                        className="text-[13px] leading-relaxed text-foreground/80 whitespace-pre-wrap font-sans break-words"
+                                        className="text-[13px] leading-relaxed text-foreground/80 whitespace-pre-wrap font-sans wrap-break-word"
                                         dangerouslySetInnerHTML={{ __html: template.body || "<em class='text-muted-foreground/40'>(empty)</em>" }}
                                     />
                                 </div>
