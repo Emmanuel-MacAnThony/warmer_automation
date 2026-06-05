@@ -601,11 +601,26 @@ async def get_batch_job_detail(job_id: int):
     paused so the UI can show the user an actual time to retry."""
     try:
         from backend.infra.db.campaign_repo import (
-            estimate_quota_reset_for_job, get_batch_send_job, get_campaign,
+            count_sent_contacts_for_scope, estimate_quota_reset_for_job,
+            get_batch_send_job, get_campaign, update_batch_send_job,
         )
         job = await get_batch_send_job(job_id)
         if not job:
             return JSONResponse(status_code=404, content={"error": "Batch job not found"})
+
+        # Self-heal stale sent counts. A buggy earlier resume could have written
+        # sent=0 even though contacts went out. We treat campaign_contacts as
+        # the source of truth and write the corrected count back so the next
+        # read is fast and consistent.
+        stored_sent = int(job.get("sent") or 0)
+        true_sent = await count_sent_contacts_for_scope(job["campaign_id"], job["tier"])
+        if true_sent > stored_sent:
+            await update_batch_send_job(job_id, sent=true_sent)
+            job["sent"] = true_sent
+            logger.info(
+                f"[batch_send job={job_id}] healed stored sent {stored_sent} -> {true_sent}"
+            )
+
         camp = await get_campaign(job["campaign_id"])
         if camp:
             job["campaign_goal"] = camp.get("goal")

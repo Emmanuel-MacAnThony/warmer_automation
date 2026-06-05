@@ -208,9 +208,21 @@ async def run(job_id: int) -> None:
         # resume after rate-limit-pause, they hold the progress the previous run
         # made — losing them resets the displayed "Sent" to 0 (which the user
         # would correctly interpret as "you just undid my progress").
-        prev_sent   = int(job.get("sent")   or 0)
+        #
+        # Self-heal: cross-check job["sent"] against the actual campaign_contacts
+        # ledger. If the stored counter has drifted lower (e.g. an earlier resume
+        # ran before the preservation fix), trust the contacts table — it's the
+        # source of truth for whether an email actually went out.
+        from backend.infra.db.campaign_repo import count_sent_contacts_for_scope
+        sent_truth  = await count_sent_contacts_for_scope(job["campaign_id"], job["tier"])
+        prev_sent   = max(int(job.get("sent") or 0), sent_truth)
         prev_failed = int(job.get("failed") or 0)
         prev_total  = int(job.get("total")  or 0)
+        if sent_truth > int(job.get("sent") or 0):
+            logger.info(
+                f"[batch_send job={job_id}] Sent counter drift detected: "
+                f"stored={job.get('sent') or 0}, actual={sent_truth} — self-healing."
+            )
         # Keep the original total if it's set; otherwise this is a fresh job and
         # the contacts list IS the universe.
         total = prev_total if prev_total > 0 else len(contacts)

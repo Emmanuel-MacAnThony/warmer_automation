@@ -711,6 +711,27 @@ async def get_running_batch_send_jobs() -> list[dict[str, Any]]:
     return [_batch_send_row(r) for r in rows]
 
 
+async def count_sent_contacts_for_scope(campaign_id: int, tier: str) -> int:
+    """
+    True count of contacts marked sent in a campaign+tier. Source of truth when
+    the batch job's stored `sent` counter has drifted (e.g. a buggy resume
+    clobbered it to 0). Caveat: if multiple batch jobs have ever sent to the
+    same tier, this overcounts for any individual job — there's no per-job
+    sender ledger today. Single-job-per-tier (the common case) is exact.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT COUNT(*) AS n
+            FROM campaign_contacts
+            WHERE campaign_id=$1 AND tier=$2 AND status='sent'
+            """,
+            campaign_id, tier,
+        )
+    return int(row["n"]) if row else 0
+
+
 async def estimate_quota_reset_for_job(job_id: int) -> Optional[str]:
     """
     Estimate when Gmail's rolling 24h send-quota will free up enough to resume
