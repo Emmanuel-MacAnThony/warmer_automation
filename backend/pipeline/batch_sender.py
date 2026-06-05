@@ -202,19 +202,38 @@ async def run(job_id: int) -> None:
             tier=job["tier"],
             scope=job.get("scope", "unsent"),
         )
-        total = len(contacts)
+
+        # Preserve cumulative counters across resumes. On the first run job["sent"]
+        # / ["failed"] / ["total"] are 0 and we initialise from scratch. On a
+        # resume after rate-limit-pause, they hold the progress the previous run
+        # made — losing them resets the displayed "Sent" to 0 (which the user
+        # would correctly interpret as "you just undid my progress").
+        prev_sent   = int(job.get("sent")   or 0)
+        prev_failed = int(job.get("failed") or 0)
+        prev_total  = int(job.get("total")  or 0)
+        # Keep the original total if it's set; otherwise this is a fresh job and
+        # the contacts list IS the universe.
+        total = prev_total if prev_total > 0 else len(contacts)
 
         await update_batch_send_job(
             job_id,
             status="running",
-            started_at=datetime.now(timezone.utc),
-            total=total,
+            # Only stamp started_at on the very first run.
+            **({"started_at": datetime.now(timezone.utc)} if not job.get("started_at") else {}),
+            # Only write total on the first run — never overwrite on resume.
+            **({"total": total} if prev_total == 0 else {}),
+            # Clear retry_after on resume — we're moving forward.
+            **({"retry_after": None} if job.get("retry_after") else {}),
         )
-        await _emit(job_id, {"type": "start", "total": total, "sent": 0, "failed": 0})
-        logger.info(f"[batch_send job={job_id}] Starting: {total} contacts, {len(senders)} sender(s)")
+        await _emit(job_id, {"type": "start", "total": total, "sent": prev_sent, "failed": prev_failed})
+        logger.info(
+            f"[batch_send job={job_id}] Starting: {len(contacts)} pending of {total} "
+            f"({prev_sent} already sent, {prev_failed} already failed), "
+            f"{len(senders)} sender(s)"
+        )
 
-        total_sent = 0
-        total_failed = 0
+        total_sent = prev_sent
+        total_failed = prev_failed
 
         # ── Main send loop ───────────────────────────────────────────────────
         for chunk_start in range(0, total, CHECKPOINT_SIZE):
