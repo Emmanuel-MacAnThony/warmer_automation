@@ -711,6 +711,52 @@ async def get_running_batch_send_jobs() -> list[dict[str, Any]]:
     return [_batch_send_row(r) for r in rows]
 
 
+async def estimate_quota_reset_for_job(job_id: int) -> Optional[str]:
+    """
+    Estimate when Gmail's rolling 24h send-quota will free up enough to resume
+    the given batch job.
+
+    Mechanism: Gmail's daily limit is rolling-window — each sent message ages
+    out of the quota 24h after it was sent. So the next "slot" opens up 24h
+    after the *earliest* still-counted send. We compute that earliest by
+    looking at campaign_contacts.sent_at for the job's campaign + tier within
+    the past 24h.
+
+    Caveat: campaign_contacts.sent_at isn't tagged with which sender account
+    sent it, so for multi-sender (round-robin) jobs this is conservative —
+    a per-sender estimate could open up slightly earlier. For single-sender
+    jobs (the common case) it's accurate.
+
+    Returns an ISO timestamp string, or None if there are no sends in the
+    last 24h to compute from.
+    """
+    from datetime import timedelta
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        # Read the job's campaign + tier so we know what to look at.
+        job_row = await conn.fetchrow(
+            "SELECT campaign_id, tier FROM batch_send_jobs WHERE id=$1",
+            job_id,
+        )
+        if not job_row:
+            return None
+        earliest_row = await conn.fetchrow(
+            """
+            SELECT MIN(sent_at) AS earliest
+            FROM campaign_contacts
+            WHERE campaign_id = $1
+              AND tier        = $2
+              AND status      = 'sent'
+              AND sent_at     > now() - interval '24 hours'
+            """,
+            job_row["campaign_id"], job_row["tier"],
+        )
+    earliest = earliest_row["earliest"] if earliest_row else None
+    if not earliest:
+        return None
+    return (earliest + timedelta(hours=24)).isoformat()
+
+
 async def update_batch_send_job(job_id: int, **fields) -> None:
     if not fields:
         return

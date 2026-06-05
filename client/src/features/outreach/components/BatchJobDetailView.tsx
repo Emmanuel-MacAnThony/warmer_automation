@@ -31,6 +31,17 @@ function fmtAbs(iso?: string | null): string {
     });
 }
 
+// "in 3h 12m" / "in 14m" / "any moment" — for the safe-retry hint.
+function fmtRel(iso: string): string {
+    const ms = new Date(iso).getTime() - Date.now();
+    if (ms <= 60_000) return "any moment";
+    const mins = Math.round(ms / 60_000);
+    if (mins < 60) return `in ${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    const leftover = mins % 60;
+    return leftover ? `in ${hrs}h ${leftover}m` : `in ${hrs}h`;
+}
+
 export function BatchJobDetailView() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -188,20 +199,42 @@ export function BatchJobDetailView() {
                 </div>
             </Card>
 
-            {/* Rate-limit banner — paused jobs need a manual resume after the quota window */}
-            {job.status === "paused" && (
-                <div className="flex items-start gap-2 px-4 py-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[12px] text-amber-300/90">
-                    <AlertTriangle size={13} className="shrink-0 mt-0.5 text-amber-400" />
-                    <span>
-                        <span className="font-semibold">Auto-paused — Gmail hit its daily send quota.</span>{" "}
-                        {job.retry_after ? (
-                            <>Resume manually after <span className="font-medium text-amber-200">{fmtAbs(job.retry_after)}</span>.</>
-                        ) : (
-                            <>Resume manually once the quota window resets (usually next morning).</>
-                        )}
-                    </span>
-                </div>
-            )}
+            {/* Rate-limit banner — paused jobs need a manual resume after the quota window.
+                Preference order for "when is it safe": Gmail's Retry-After (if any) →
+                our derived quota_resets_at (earliest recent send + 24h) → generic copy. */}
+            {job.status === "paused" && (() => {
+                const safeAt = job.retry_after ?? job.quota_resets_at;
+                const isPast = safeAt ? new Date(safeAt).getTime() <= Date.now() : false;
+                return (
+                    <div className="flex items-start gap-2 px-4 py-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[12px] text-amber-300/90">
+                        <AlertTriangle size={13} className="shrink-0 mt-0.5 text-amber-400" />
+                        <span>
+                            <span className="font-semibold">Auto-paused — Gmail hit its daily send quota.</span>{" "}
+                            {safeAt ? (
+                                isPast ? (
+                                    <>Quota window has reset — safe to resume now.</>
+                                ) : (
+                                    <>
+                                        Safe to resume at{" "}
+                                        <span className="font-medium text-amber-200">{fmtAbs(safeAt)}</span>{" "}
+                                        <span className="text-amber-300/60">({fmtRel(safeAt)})</span>
+                                        {!job.retry_after && (
+                                            <>
+                                                {" "}—{" "}
+                                                <span className="text-amber-300/55">
+                                                    estimated from your earliest send in the last 24h.
+                                                </span>
+                                            </>
+                                        )}
+                                    </>
+                                )
+                            ) : (
+                                <>Resume manually once the quota window resets (usually 24h after your first send).</>
+                            )}
+                        </span>
+                    </div>
+                );
+            })()}
 
             {/* High bounce rate warning */}
             {showBounceWarning && (

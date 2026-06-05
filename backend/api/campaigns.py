@@ -596,9 +596,13 @@ async def list_all_batch_jobs(base_id: str, table_id: str):
 @router.get("/batch-jobs/{job_id}")
 async def get_batch_job_detail(job_id: int):
     """Single batch job — used by the batch-job detail page. Joins the campaign goal
-    + pitch page so the detail view doesn't need a second roundtrip."""
+    + pitch page so the detail view doesn't need a second roundtrip, and computes
+    quota_resets_at (when Gmail's rolling 24h window opens up) when the job is
+    paused so the UI can show the user an actual time to retry."""
     try:
-        from backend.infra.db.campaign_repo import get_batch_send_job, get_campaign
+        from backend.infra.db.campaign_repo import (
+            estimate_quota_reset_for_job, get_batch_send_job, get_campaign,
+        )
         job = await get_batch_send_job(job_id)
         if not job:
             return JSONResponse(status_code=404, content={"error": "Batch job not found"})
@@ -607,6 +611,9 @@ async def get_batch_job_detail(job_id: int):
             job["campaign_goal"] = camp.get("goal")
             job["pitch_page_url"] = camp.get("pitch_page_url")
             job["pitch_page_label"] = camp.get("pitch_page_label")
+        # Only useful when paused; harmless to compute always. None if no recent
+        # send activity to estimate from.
+        job["quota_resets_at"] = await estimate_quota_reset_for_job(job_id)
         return job
     except Exception as e:
         logger.error(f"Failed to get batch job {job_id}: {e}")

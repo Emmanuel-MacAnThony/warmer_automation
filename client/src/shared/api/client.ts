@@ -370,6 +370,10 @@ export interface BatchEmailJob extends Omit<BatchSendJob, never> {
 export interface BatchJobDetail extends BatchEmailJob {
   pitch_page_url: string | null
   pitch_page_label: string | null
+  // Estimated time when Gmail's rolling 24h send quota will free up enough
+  // to resume — computed from the earliest send in the past 24h + 24h.
+  // null when there's no recent send activity to estimate from.
+  quota_resets_at: string | null
 }
 
 export interface BatchJobBounce {
