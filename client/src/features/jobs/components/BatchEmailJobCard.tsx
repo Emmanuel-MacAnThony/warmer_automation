@@ -2,7 +2,7 @@ import type { BatchEmailJob } from "@/shared/api/client";
 import { Card } from "@/shared/components/ui/card";
 import { cn } from "@/shared/lib/utils";
 import { motion } from "framer-motion";
-import { AlertTriangle, ChevronRight, FileText, Loader2, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, FileText, Loader2, Pause, Play, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { EMAIL_JOB_STATUS, TIER_META } from "../utils";
@@ -11,6 +11,7 @@ export interface BatchEmailJobCardProps {
     job: BatchEmailJob;
     onDelete: (job: BatchEmailJob) => void;
     deleting: boolean;
+    onToggle?: (job: BatchEmailJob) => void;
     onTemplateClick?: (job: BatchEmailJob) => void;
 }
 
@@ -25,16 +26,19 @@ function fmtRetry(iso: string): string {
     });
 }
 
-export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: BatchEmailJobCardProps) {
+export function BatchEmailJobCard({ job, onDelete, deleting, onToggle, onTemplateClick }: BatchEmailJobCardProps) {
     const navigate  = useNavigate();
     const tier      = TIER_META[job.tier]          ?? TIER_META.tier_1;
     const status    = EMAIL_JOB_STATUS[job.status] ?? EMAIL_JOB_STATUS.pending;
     const remaining = Math.max(0, job.total - job.sent - job.failed);
     const pct       = job.total > 0 ? Math.min(100, Math.round((job.sent / job.total) * 100)) : 0;
     const isActive  = job.status === "pending" || job.status === "running";
-    // Rate-limit pause is inferred from (status=paused AND retry_after set) —
-    // there's no dedicated pause_reason column on batch_send_jobs (yet).
-    const rateLimited = job.status === "paused" && !!job.retry_after;
+    // Show the auto-pause banner whenever the job is paused. If we got a
+    // retry_after from Gmail's Retry-After header, surface it; otherwise
+    // just tell the user the job's paused and resumable.
+    const isPaused = job.status === "paused";
+    // Pause/Resume only makes sense while the job hasn't finished yet.
+    const canToggle = job.status === "running" || job.status === "pending" || job.status === "paused";
 
     const [pauseBannerDismissed, setPauseBannerDismissed] = useState(false);
 
@@ -70,6 +74,15 @@ export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: 
                     <span className="text-[11px] font-mono text-muted-foreground/40 shrink-0">
                         {new Date(job.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </span>
+                    {onToggle && canToggle && (
+                        <button
+                            onClick={stopAndDo(() => onToggle(job))}
+                            title={isPaused ? "Resume" : "Pause"}
+                            className="p-1 rounded transition-colors shrink-0 hover:bg-muted hover:text-foreground text-muted-foreground/50 cursor-pointer"
+                        >
+                            {isPaused ? <Play size={13} /> : <Pause size={13} />}
+                        </button>
+                    )}
                     <button
                         onClick={stopAndDo(() => onDelete(job))}
                         disabled={deleting}
@@ -79,14 +92,19 @@ export function BatchEmailJobCard({ job, onDelete, deleting, onTemplateClick }: 
                     </button>
                 </div>
 
-                {/* Rate-limit banner — only on a paused job with a retry_after
-                    timestamp. Mirrors the enrichment job card pattern so the
-                    user knows when Gmail's quota frees up and they can resume. */}
-                {rateLimited && !pauseBannerDismissed && (
+                {/* Auto-pause banner — visible whenever the job is paused.
+                    If we captured Gmail's Retry-After timestamp, surface it so
+                    the user knows when the daily quota window resets. */}
+                {isPaused && !pauseBannerDismissed && (
                     <div className="flex items-start gap-3 px-4 py-2.5 border-b border-amber-500/20 bg-amber-500/5">
                         <AlertTriangle size={13} className="text-amber-400 shrink-0 mt-0.5" />
                         <p className="flex-1 text-[11px] font-mono text-amber-300/85 leading-relaxed">
-                            Auto-paused — Gmail hit its daily send quota. Resume manually after <span className="font-semibold text-amber-200">{fmtRetry(job.retry_after!)}</span>.
+                            Auto-paused — Gmail hit its daily send quota.{" "}
+                            {job.retry_after ? (
+                                <>Resume manually after <span className="font-semibold text-amber-200">{fmtRetry(job.retry_after)}</span>.</>
+                            ) : (
+                                <>Resume manually once the quota window resets (usually next morning).</>
+                            )}
                         </p>
                         <button
                             onClick={stopAndDo(() => setPauseBannerDismissed(true))}

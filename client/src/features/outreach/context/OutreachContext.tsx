@@ -42,6 +42,7 @@ export type OutreachContextValue = {
     // Batch email jobs
     batchEmailJobs: BatchEmailJob[];
     loadingBatchEmailJobs: boolean;
+    toggleBatchEmailJob: (job: BatchEmailJob) => void;
     deleteBatchEmailTarget: BatchEmailJob | null;
     setDeleteBatchEmailTarget: (j: BatchEmailJob | null) => void;
     deletingBatchEmail: number | null;

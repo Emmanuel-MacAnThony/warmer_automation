@@ -189,12 +189,16 @@ export function BatchJobDetailView() {
             </Card>
 
             {/* Rate-limit banner — paused jobs need a manual resume after the quota window */}
-            {job.status === "paused" && job.retry_after && (
+            {job.status === "paused" && (
                 <div className="flex items-start gap-2 px-4 py-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[12px] text-amber-300/90">
                     <AlertTriangle size={13} className="shrink-0 mt-0.5 text-amber-400" />
                     <span>
                         <span className="font-semibold">Auto-paused — Gmail hit its daily send quota.</span>{" "}
-                        Resume manually after <span className="font-medium text-amber-200">{fmtAbs(job.retry_after)}</span>.
+                        {job.retry_after ? (
+                            <>Resume manually after <span className="font-medium text-amber-200">{fmtAbs(job.retry_after)}</span>.</>
+                        ) : (
+                            <>Resume manually once the quota window resets (usually next morning).</>
+                        )}
                     </span>
                 </div>
             )}

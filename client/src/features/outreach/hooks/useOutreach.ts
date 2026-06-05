@@ -145,6 +145,19 @@ export function useOutreach(): OutreachContextValue & { baseId: string | null; t
         }
     }, [loadSequences]);
 
+    const toggleBatchEmailJob = useCallback(async (job: BatchEmailJob) => {
+        try {
+            if (job.status === "running" || job.status === "pending") {
+                await api.pauseBatchSendJob(job.campaign_id, job.id);
+            } else if (job.status === "paused") {
+                await api.resumeBatchSendJob(job.campaign_id, job.id);
+            }
+            await loadBatchEmailJobs();
+        } catch (e: any) {
+            toast.error(e.message ?? "Failed to update batch job");
+        }
+    }, []);
+
     const handleDeleteSequence = useCallback(async () => {
         if (!deleteSeqTarget) return;
         setDeletingSeq(true);
@@ -373,7 +386,7 @@ export function useOutreach(): OutreachContextValue & { baseId: string | null; t
         pitchPageUrl, setPitchPageUrl,
         pitchPageLabel, setPitchPageLabel,
         creating, handleCreate,
-        batchEmailJobs, loadingBatchEmailJobs,
+        batchEmailJobs, loadingBatchEmailJobs, toggleBatchEmailJob,
         deleteBatchEmailTarget, setDeleteBatchEmailTarget,
         deletingBatchEmail, handleDeleteBatchEmail,
         sequences, loadingSequences, toggleSequence,

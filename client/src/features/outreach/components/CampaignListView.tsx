@@ -19,7 +19,7 @@ export function CampaignListView() {
         openCampaign, setView, setGoal,
         expandedCard,
         setActiveCampaign,
-        batchEmailJobs, loadingBatchEmailJobs,
+        batchEmailJobs, loadingBatchEmailJobs, toggleBatchEmailJob,
         deleteBatchEmailTarget, setDeleteBatchEmailTarget,
         deletingBatchEmail, handleDeleteBatchEmail,
         sequences, loadingSequences, toggleSequence,
@@ -191,6 +191,7 @@ export function CampaignListView() {
                                     key={job.id}
                                     job={job}
                                     onDelete={(j) => setDeleteBatchEmailTarget(j)}
+                                    onToggle={toggleBatchEmailJob}
                                     deleting={deletingBatchEmail === job.id}
                                     onTemplateClick={(j) => {
                                         const c = campaigns.find((c) => c.id === j.campaign_id);
