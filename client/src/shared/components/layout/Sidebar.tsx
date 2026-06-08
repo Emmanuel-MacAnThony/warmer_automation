@@ -18,7 +18,7 @@ const COLLAPSED = 60;
 
 const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", to: "/" },
-    { icon: Briefcase, label: "Jobs", to: "/jobs" },
+    { icon: Briefcase, label: "Enrichment", to: "/jobs" },
     // { icon: GitBranch,       label: 'Mappings',  to: '/mappings' },
     { icon: Mail, label: "Outreach", to: "/outreach" },
     // { icon: Wrench, label: 'Utils', to: '/utils' },
