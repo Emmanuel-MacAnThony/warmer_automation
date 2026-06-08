@@ -833,11 +833,19 @@ async def pause_batch_send_job(job_id: int) -> bool:
     """
     Signal the runner to pause at the next chunk boundary.
     Only valid for running or pending jobs. Returns True if updated.
+
+    Explicitly clears pause_reason + retry_after — this is a *manual* pause,
+    so the UI banner that says "Gmail hit its quota" must NOT show. Auto-pause
+    (rate_limited) sets these fields in batch_sender.run().
     """
     pool = await get_pool()
     async with pool.acquire() as conn:
         result = await conn.execute(
-            "UPDATE batch_send_jobs SET status='paused' WHERE id=$1 AND status IN ('running','pending')",
+            """
+            UPDATE batch_send_jobs
+            SET status='paused', pause_reason=NULL, retry_after=NULL
+            WHERE id=$1 AND status IN ('running','pending')
+            """,
             job_id,
         )
     return result != "UPDATE 0"

@@ -391,6 +391,9 @@ ALTER TABLE batch_send_jobs     ADD CONSTRAINT batch_send_jobs_status_check
 ALTER TABLE batch_send_jobs     ADD COLUMN IF NOT EXISTS test_recipient TEXT;
 -- pause_reason: set to 'rate_limited' on auto-pause, null on manual pause/resume
 ALTER TABLE enrichment_jobs     ADD COLUMN IF NOT EXISTS pause_reason TEXT;
+-- Same idea for batch sends — distinguishes auto-pause from manual pause so
+-- the UI only shows the "Gmail hit its quota" banner when that's actually true.
+ALTER TABLE batch_send_jobs     ADD COLUMN IF NOT EXISTS pause_reason TEXT;
 -- retry_after: ISO timestamp hint from Gmail Retry-After header; shown in UI banner
 ALTER TABLE batch_send_jobs     ADD COLUMN IF NOT EXISTS retry_after  TIMESTAMPTZ;
 -- last_reply_check_at: rotates the reply poller fairly across all enrollments

@@ -33,10 +33,11 @@ export function BatchEmailJobCard({ job, onDelete, deleting, onToggle, onTemplat
     const remaining = Math.max(0, job.total - job.sent - job.failed);
     const pct       = job.total > 0 ? Math.min(100, Math.round((job.sent / job.total) * 100)) : 0;
     const isActive  = job.status === "pending" || job.status === "running";
-    // Show the auto-pause banner whenever the job is paused. If we got a
-    // retry_after from Gmail's Retry-After header, surface it; otherwise
-    // just tell the user the job's paused and resumable.
+    // Auto-pause banner shows only when the runner paused the job because of
+    // Gmail's quota (pause_reason='rate_limited'). Manual pauses get no banner
+    // — the user knows why they pressed Pause.
     const isPaused = job.status === "paused";
+    const autoPaused = isPaused && job.pause_reason === "rate_limited";
     // Pause/Resume only makes sense while the job hasn't finished yet.
     const canToggle = job.status === "running" || job.status === "pending" || job.status === "paused";
 
@@ -92,10 +93,9 @@ export function BatchEmailJobCard({ job, onDelete, deleting, onToggle, onTemplat
                     </button>
                 </div>
 
-                {/* Auto-pause banner — visible whenever the job is paused.
-                    If we captured Gmail's Retry-After timestamp, surface it so
-                    the user knows when the daily quota window resets. */}
-                {isPaused && !pauseBannerDismissed && (
+                {/* Auto-pause banner — visible only when the runner auto-paused
+                    because of Gmail's daily quota. Manual pauses are silent. */}
+                {autoPaused && !pauseBannerDismissed && (
                     <div className="flex items-start gap-3 px-4 py-2.5 border-b border-amber-500/20 bg-amber-500/5">
                         <AlertTriangle size={13} className="text-amber-400 shrink-0 mt-0.5" />
                         <p className="flex-1 text-[11px] font-mono text-amber-300/85 leading-relaxed">

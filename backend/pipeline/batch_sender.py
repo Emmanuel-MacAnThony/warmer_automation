@@ -234,8 +234,9 @@ async def run(job_id: int) -> None:
             **({"started_at": datetime.now(timezone.utc)} if not job.get("started_at") else {}),
             # Only write total on the first run — never overwrite on resume.
             **({"total": total} if prev_total == 0 else {}),
-            # Clear retry_after on resume — we're moving forward.
+            # Clear retry_after + pause_reason on resume — we're moving forward.
             **({"retry_after": None} if job.get("retry_after") else {}),
+            **({"pause_reason": None} if job.get("pause_reason") else {}),
         )
         await _emit(job_id, {"type": "start", "total": total, "sent": prev_sent, "failed": prev_failed})
         logger.info(
@@ -441,7 +442,8 @@ async def run(job_id: int) -> None:
                         datetime.now(timezone.utc) + timedelta(seconds=max_retry_after)
                     ).isoformat()
                 await update_batch_send_job(
-                    job_id, status="paused", sent=total_sent, failed=total_failed,
+                    job_id, status="paused", pause_reason="rate_limited",
+                    sent=total_sent, failed=total_failed,
                     **({"retry_after": retry_at_iso} if retry_at_iso else {}),
                 )
                 await _emit(job_id, {

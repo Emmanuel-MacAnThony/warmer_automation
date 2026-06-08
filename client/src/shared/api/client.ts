@@ -398,6 +398,10 @@ export interface BatchSendJob {
   failed: number
   scope: BatchSendScope
   error?: string
+  // Set to 'rate_limited' when the runner auto-paused because all senders hit
+  // Gmail's daily quota. Null on manual pause. Drives the "Gmail hit its
+  // quota" banner so it only shows when that's actually what happened.
+  pause_reason?: string | null
   retry_after?: string
   started_at?: string
   completed_at?: string

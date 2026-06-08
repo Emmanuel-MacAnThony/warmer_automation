@@ -199,10 +199,11 @@ export function BatchJobDetailView() {
                 </div>
             </Card>
 
-            {/* Rate-limit banner — paused jobs need a manual resume after the quota window.
-                Preference order for "when is it safe": Gmail's Retry-After (if any) →
-                our derived quota_resets_at (earliest recent send + 24h) → generic copy. */}
-            {job.status === "paused" && (() => {
+            {/* Rate-limit banner — only when the runner auto-paused due to Gmail's quota.
+                Manual pauses get no banner (the user knows why they paused). Preference
+                order for "when is it safe": Gmail's Retry-After (if any) → our derived
+                quota_resets_at (earliest recent send + 24h) → generic copy. */}
+            {job.status === "paused" && job.pause_reason === "rate_limited" && (() => {
                 const safeAt = job.retry_after ?? job.quota_resets_at;
                 const isPast = safeAt ? new Date(safeAt).getTime() <= Date.now() : false;
                 return (
